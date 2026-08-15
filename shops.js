@@ -123,9 +123,6 @@
         ctx.fillStyle = '#111827';
         ctx.font = 'bold 28px DotGothic16, sans-serif';
         ctx.fillText('くじ引き 20円', 800, 690);
-        ctx.fillStyle = '#fff7ed';
-        ctx.font = 'bold 14px sans-serif';
-        ctx.fillText('[E] で1回引く', 800, 720);
 
         for (let i = 0; i < 6; i++) {
             ctx.fillStyle = i % 2 ? '#ef4444' : '#f8fafc';
@@ -194,9 +191,6 @@
         ctx.fillStyle = '#f472b6';
         ctx.font = 'bold 16px DotGothic16, sans-serif';
         ctx.fillText('INVADER', 800, 700);
-        ctx.fillStyle = '#67e8f9';
-        ctx.font = 'bold 13px sans-serif';
-        ctx.fillText('[E] でプレイ', 800, 724);
 
         ctx.fillStyle = '#22d3ee';
         ctx.fillRect(740, 1082, 120, 18);
@@ -357,14 +351,6 @@
                 ctx.font = 'bold 22px DotGothic16, sans-serif';
                 ctx.textAlign = 'center';
                 ctx.fillText(this.won ? 'STAGE CLEAR' : 'GAME OVER', 200, 128);
-                ctx.fillStyle = '#e2e8f0';
-                ctx.font = '12px sans-serif';
-                ctx.fillText('[E] で景品を受け取る', 200, 156);
-            } else {
-                ctx.fillStyle = '#94a3b8';
-                ctx.font = '11px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('← → 移動  /  J 発射  /  E やめる', 200, 294);
             }
             ctx.restore();
         }

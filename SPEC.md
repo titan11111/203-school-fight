@@ -4,8 +4,8 @@
 - 対象ゲーム: `203-school-fight`
 - 作成日: 2026-08-15
 - 更新日: 2026-08-15
-- ステータス: 改修中（出荷）
-- 参照ファイル: `index.html` `combat.js` `enemies.js` `shops.js` `school-map.js`
+- ステータス: 出荷
+- 参照ファイル: `index.html` `combat.js` `enemies.js` `shops.js` `arcade.js` `school-map.js`
 
 ## 1. ゲーム概要
 
@@ -13,7 +13,7 @@
 - 一言説明: 桜ヶ丘中学校から道路・商店街を抜け、公園の暗黒校長を倒す放課後アクション。
 - 想定プレイ時間: 10〜20分
 - 想定プレイヤー: iPhone Safari
-- クリア体験の要点: 校門→道路→商店街（回復・くじ・インベーダー）→公園ボス撃破
+- クリア体験の要点: 校門→道路→商店街（回復・くじ・筐体5種）→公園ボス撃破
 
 ## 2. 対象環境
 
@@ -34,11 +34,13 @@
   combat.js
   enemies.js
   shops.js
+  arcade.js
   school-map.js
   images/
+  audio/
 ```
 
-CSSは `index.html` 内。音声は Tone.js（CDN）。
+CSSは `index.html` 内。SEは Tone.js（CDN）。BGMは `audio/bgm-*.m4a`。
 
 ## 4. コアループ
 
@@ -54,7 +56,7 @@ CSSは `index.html` 内。音声は Tone.js（CDN）。
 
 - タイトル → プレイ（SCHOOL / ROAD / SHOPPING / BAKERY / DAGASHI / ARCADE / PARK）
 - 会話ダイアログ中は移動停止
-- 店内ミニゲーム: くじ引き / インベーダー
+- 店内ミニゲーム: くじ引き / FROG / PAC / RACE / PUNCH / インベーダー（スコア÷5が円）
 - ボス撃破 → クリア会話
 - 死亡 → 学校へ戻され HP全快（ゲームオーバー画面は無し）
 
@@ -81,7 +83,11 @@ CSSは `index.html` 内。音声は Tone.js（CDN）。
 
 ## 9. 音声
 
-- Tone.js プロシージャル。開始タップで unlock。
+- 開始タップで unlock。
+- BGM 4本: 学校=`bgm-skeletons` / 路上=Web Audio / 商店街・店内=`bgm-lantern` / 公園=`bgm-showdown`
+- テーマが変わるときだけカットイン（旧曲停止→スティング→新曲を頭から）。店内は商店街のまま。
+- 攻撃SE: Tone.js（Web Audio）。攻撃時に曲を重ねない。ボスつぶやき: mutter（PARK）。
+- 武器・必殺は `CombatKit.WEAPONS` のデータ駆動。
 
 ## 10. 保存
 

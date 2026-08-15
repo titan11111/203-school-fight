@@ -15,16 +15,134 @@
         return { x: 0, y: 1 };
     }
 
-    // 足元原点のキャラから、目線付近までの持ち上げ量
-    const MUZZLE_LIFT = 88;
+    // 足元原点。下向きスプライトは頭まで約74pxなので、88だと頭上になる
+    // フルートは口元から、さらに約2mm（iPhone論理幅で11px）下げる
+    const FLUTE_DROP = 11;
 
-    function muzzle(entity, along) {
+    function muzzleLift(entity, kind) {
+        const down = entity.facing === 'down';
+        if (kind === 'flute') return down ? 54 : 68;
+        return down ? 42 : 50;
+    }
+
+    function muzzle(entity, along, kind) {
         along = along || 0;
         const dir = facingVec(entity.facing);
+        const lift = muzzleLift(entity, kind);
+        const drop = kind === 'flute' ? FLUTE_DROP : 0;
         return {
             x: entity.x + dir.x * along,
-            y: entity.y - MUZZLE_LIFT + dir.y * along
+            y: entity.y - lift + dir.y * along + drop
         };
+    }
+
+    const WEAPONS = {
+        yoyo: {
+            id: 'yoyo',
+            name: 'ヨーヨー',
+            attackFrames: 16,
+            skillCost: 40,
+            skillFrames: 26,
+            sfx: 'yoyo',
+            attackAnim: function (combo) { return combo === 2 ? 'yoyo_spin_a' : 'yoyo_throw'; },
+            skillAnim: 'yoyo_spin_c'
+        },
+        flute: {
+            id: 'flute',
+            name: 'フルート',
+            attackFrames: 12,
+            skillCost: 35,
+            skillFrames: 26,
+            sfx: 'flute',
+            attackAnim: function (combo) { return combo === 3 ? 'flute_shot' : 'flute_play'; },
+            skillAnim: 'flute_shot'
+        }
+    };
+
+    function weaponOf(id) {
+        return WEAPONS[id] || WEAPONS.yoyo;
+    }
+
+    function fireAttack(weaponId, player, projectiles, comboStep) {
+        const w = weaponOf(weaponId);
+        const dir = facingVec(player.facing);
+        if (w.id === 'flute') {
+            const shot = muzzle(player, 28, 'flute');
+            const speed = 7 + comboStep;
+            projectiles.spawn({
+                x: shot.x,
+                y: shot.y,
+                vx: dir.x * speed,
+                vy: dir.y * speed,
+                life: 42,
+                kind: 'note',
+                radius: 9 + comboStep * 2,
+                damage: Math.floor(player.atk * (0.7 + comboStep * 0.25)),
+                poise: 6 + comboStep * 3,
+                owner: 'player',
+                note: comboStep
+            });
+            return w;
+        }
+        const yo = muzzle(player, 20, 'yoyo');
+        projectiles.spawn({
+            x: yo.x,
+            y: yo.y,
+            vx: dir.x * 9,
+            vy: dir.y * 9,
+            life: 34,
+            kind: 'yoyo',
+            phase: 'out',
+            homeX: yo.x,
+            homeY: yo.y,
+            radius: 14,
+            damage: Math.floor(player.atk * (0.85 + comboStep * 0.22)),
+            poise: 10 + comboStep * 4,
+            owner: 'player',
+            pull: comboStep === 3
+        });
+        return w;
+    }
+
+    function fireSkill(weaponId, player, projectiles) {
+        const w = weaponOf(weaponId);
+        const origin = muzzle(player, 0, w.id);
+        if (w.id === 'flute') {
+            for (let i = 0; i < 8; i++) {
+                const a = (Math.PI * 2 / 8) * i;
+                projectiles.spawn({
+                    x: origin.x,
+                    y: origin.y,
+                    vx: Math.cos(a) * 6.5,
+                    vy: Math.sin(a) * 6.5,
+                    life: 36,
+                    kind: 'note',
+                    radius: 12,
+                    damage: Math.floor(player.atk * 1.4),
+                    poise: 18,
+                    owner: 'player',
+                    note: i
+                });
+            }
+            return origin;
+        }
+        projectiles.spawn({
+            x: origin.x + 70,
+            y: origin.y,
+            vx: 0,
+            vy: 0,
+            life: 28,
+            kind: 'yoyo',
+            homeX: origin.x,
+            homeY: origin.y,
+            radius: 18,
+            damage: Math.floor(player.atk * 1.6),
+            poise: 28,
+            owner: 'player',
+            spin: true,
+            pull: true
+        });
+        return origin;
     }
 
     function rankOf(combo) {
@@ -191,7 +309,7 @@
         update(player, enemies, onHitEnemy, onHitPlayer) {
             for (let i = this.live.length - 1; i >= 0; i--) {
                 const p = this.live[i];
-                const hand = muzzle(player);
+                const hand = muzzle(player, 0, 'yoyo');
                 if (p.kind === 'yoyo') {
                     p.homeX = hand.x;
                     p.homeY = hand.y;
@@ -392,8 +510,12 @@
         DestructibleField,
         facingVec,
         muzzle,
-        MUZZLE_LIFT,
+        muzzleLift,
         rankOf,
-        RANKS
+        RANKS,
+        WEAPONS,
+        weaponOf,
+        fireAttack,
+        fireSkill
     };
 })(window);

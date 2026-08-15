@@ -14,9 +14,14 @@
             box-sizing: border-box;
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
             user-select: none;
+            -webkit-user-drag: none;
             touch-action: none;
         }
+        ::selection { background: transparent; color: inherit; }
+        ::-moz-selection { background: transparent; color: inherit; }
         html, body {
             margin: 0;
             padding: 0;
@@ -55,6 +60,15 @@
             display: block;
             width: 100%;
             height: 100%;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-user-drag: none;
+        }
+        button, canvas, img, svg {
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-user-drag: none;
+            user-select: none;
         }
         #virtual-controls {
             flex: 0 0 25%;
@@ -101,22 +115,25 @@
             align-items: center;
             justify-content: center;
             touch-action: manipulation;
-            transition: transform 0.08s ease, opacity 0.08s ease;
+            transition: transform 0.05s ease, opacity 0.05s ease, filter 0.05s ease, box-shadow 0.05s ease;
+            box-shadow: 0 4px 0 #0f172a;
         }
         .dpad button:active,
         .dpad button.is-pressed {
-            transform: scale(0.92);
+            transform: scale(0.86);
             background: #ec4899;
             border-color: #f9a8d4;
+            filter: brightness(1.2);
+            box-shadow: 0 1px 0 #0f172a;
         }
         #dpad-up { top: 2%; left: 50%; transform: translateX(-50%); }
         #dpad-down { bottom: 2%; left: 50%; transform: translateX(-50%); }
         #dpad-left { left: 2%; top: 50%; transform: translateY(-50%); }
         #dpad-right { right: 2%; top: 50%; transform: translateY(-50%); }
-        #dpad-up:active, #dpad-up.is-pressed { transform: translateX(-50%) scale(0.92); }
-        #dpad-down:active, #dpad-down.is-pressed { transform: translateX(-50%) scale(0.92); }
-        #dpad-left:active, #dpad-left.is-pressed { transform: translateY(-50%) scale(0.92); }
-        #dpad-right:active, #dpad-right.is-pressed { transform: translateY(-50%) scale(0.92); }
+        #dpad-up:active, #dpad-up.is-pressed { transform: translateX(-50%) scale(0.86) translateY(3px); }
+        #dpad-down:active, #dpad-down.is-pressed { transform: translateX(-50%) scale(0.86) translateY(3px); }
+        #dpad-left:active, #dpad-left.is-pressed { transform: translateY(-50%) scale(0.86) translateY(3px); }
+        #dpad-right:active, #dpad-right.is-pressed { transform: translateY(-50%) scale(0.86) translateY(3px); }
         .ctrl-quest {
             flex: 1;
             min-width: 0;
@@ -136,14 +153,57 @@
             min-width: 56px;
             min-height: 56px;
             padding: 4px 6px;
-            transition: transform 0.08s ease, opacity 0.08s ease, filter 0.08s ease, box-shadow 0.08s ease;
+            cursor: pointer;
+            transition: transform 0.05s ease, opacity 0.05s ease, filter 0.05s ease, box-shadow 0.05s ease;
             will-change: transform;
             touch-action: manipulation;
-            box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
+            box-shadow: 0 5px 0 rgba(0, 0, 0, 0.45);
         }
         .btn-action:active, .btn-action.is-pressed {
-            transform: scale(0.92);
-            opacity: 0.88;
+            transform: scale(0.88) translateY(4px);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+            filter: brightness(1.18);
+            opacity: 1;
+        }
+        #btn-interact.is-ready:active,
+        #btn-interact.is-ready.is-pressed {
+            transform: scale(0.88) translateY(4px);
+        }
+        #btn-interact:not(.is-ready) {
+            opacity: 0.4;
+            filter: grayscale(0.35);
+        }
+        #btn-interact.is-ready {
+            opacity: 1;
+            outline: 3px solid #34d399;
+            outline-offset: 2px;
+            animation: interact-pulse 0.9s ease-in-out infinite;
+            z-index: 2;
+        }
+        #btn-dash.is-just {
+            outline: 3px solid #f87171;
+            outline-offset: 2px;
+            animation: just-pulse 0.4s ease-in-out infinite;
+        }
+        @keyframes interact-pulse {
+            0%, 100% { outline-color: #34d399; }
+            50% { outline-color: #a7f3d0; }
+        }
+        @keyframes just-pulse {
+            0%, 100% { outline-color: #f87171; }
+            50% { outline-color: #fecaca; }
+        }
+        .use-btn, #dialog-next-btn, #close-inventory-btn, #close-features-btn, #start-btn {
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: manipulation;
+            cursor: pointer;
+            transition: transform 0.05s ease, filter 0.05s ease;
+        }
+        .use-btn.is-pressed, #dialog-next-btn.is-pressed,
+        #close-inventory-btn.is-pressed, #close-features-btn.is-pressed {
+            transform: scale(0.9);
+            filter: brightness(1.15);
         }
         .overlay-full {
             position: fixed;
@@ -202,14 +262,8 @@
                     スクールクエスト<br><span class="text-xl font-bold text-white">〜放課後の決戦〜</span>
                 </h1>
                 <p class="text-slate-300 text-sm leading-relaxed">
-                    校門を抜け、商店街を走り、公園の<span class="text-red-400 font-bold">暗黒校長</span>を倒せ。
+                    公園の<span class="text-red-400 font-bold">暗黒校長</span>を倒せ。
                 </p>
-                <button id="show-features-btn" type="button" class="text-xs text-cyan-400 underline font-semibold">
-                    搭載システムを見る
-                </button>
-                <div class="text-[11px] text-slate-400 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 text-left">
-                    下の十字キーで移動。攻撃・回避・必殺は右のボタン。
-                </div>
             </div>
         </div>
 <div id="game-stage">
@@ -410,7 +464,7 @@
         <div class="ctrl-quest">
             <div class="text-[10px] font-extrabold text-pink-400">目的</div>
             <div id="quest-tracker-text" class="text-[10px] font-semibold text-slate-200 leading-snug mt-0.5">
-                学校のグラウンドで練習し、南の校門から道路へ出よう。
+                校門
             </div>
         </div>
         <div class="action-btns">
@@ -444,6 +498,7 @@
 
     <script src="combat.js"></script>
     <script src="shops.js"></script>
+    <script src="arcade.js"></script>
     <script src="enemies.js"></script>
     <script src="school-map.js"></script>
     <script>
@@ -514,7 +569,17 @@
         const comboRank = new CombatKit.ComboRank();
         const projectiles = new CombatKit.ProjectilePool(48);
         const breakables = new CombatKit.DestructibleField();
-        const invaderGame = new ShopKit.InvaderGame();
+        const arcadeGames = {
+            invaders: new ShopKit.InvaderGame(),
+            frog: new ArcadeKit.FrogGame(),
+            pac: new ArcadeKit.PacGame(),
+            race: new ArcadeKit.RaceGame(),
+            punch: new ArcadeKit.PunchGame()
+        };
+
+        function currentArcade() {
+            return arcadeGames[GameState.minigame] || null;
+        }
 
         // =====================================================================
         // HERO SPRITE ATLAS (transparent sheet extracted from concept art)
@@ -665,36 +730,72 @@
                 this.synth = null;
                 this.bgmSynth = null;
                 this.loop = null;
+                this.voices = {
+                    mutter: this.makeClip('audio/voice-mutter.m4a', 0.22)
+                };
+                this.voices.mutter.loop = true;
+                this.mutterOn = false;
+                this.bgm = {
+                    school: this.makeClip('audio/bgm-skeletons.m4a', 0.46),
+                    town: this.makeClip('audio/bgm-lantern.m4a', 0.46),
+                    park: this.makeClip('audio/bgm-showdown.m4a', 0.52)
+                };
+                Object.keys(this.bgm).forEach((key) => { this.bgm[key].loop = true; });
+                this.bgmTheme = null;
+                this.roadParts = null;
+                this.areaTheme = {
+                    SCHOOL: 'school',
+                    ROAD: 'road',
+                    SHOPPING: 'town',
+                    BAKERY: 'town',
+                    DAGASHI: 'town',
+                    ARCADE: 'town',
+                    PARK: 'park'
+                };
+            }
+
+            makeClip(src, volume) {
+                const el = new Audio(src);
+                el.preload = 'auto';
+                el.volume = volume;
+                return el;
+            }
+
+            unlockClip(el) {
+                if (!el) return;
+                const p = el.play();
+                if (p && p.then) {
+                    p.then(() => {
+                        el.pause();
+                        el.currentTime = 0;
+                    }).catch(() => {});
+                }
+            }
+
+            playClip(el) {
+                if (!GameState.audioInitialized || !el) return;
+                try {
+                    el.currentTime = 0;
+                    el.play().catch(() => {});
+                } catch (e) { /* ignore */ }
             }
 
             init() {
                 if (GameState.audioInitialized) return;
                 try {
                     Tone.start();
+                    this.unlockClip(this.voices.mutter);
+                    Object.keys(this.bgm).forEach((key) => this.unlockClip(this.bgm[key]));
                     this.synth = new Tone.PolySynth(Tone.Synth).toDestination();
                     this.synth.volume.value = -10;
 
                     this.bgmSynth = new Tone.MembraneSynth().toDestination();
-                    this.bgmSynth.volume.value = -16;
-
-                    // 簡易レトロBGMループ
-                    const notes = ["C3", "E3", "G3", "B3", "A3", "F3", "G3", "C4"];
-                    let index = 0;
-                    Tone.Transport.scheduleRepeat((time) => {
-                        if (GameState.started && !GameState.paused) {
-                            let note = notes[index % notes.length];
-                            if (GameState.currentArea === 'PARK') note = "C2";
-                            if (GameState.currentArea === 'BAKERY') note = "E4";
-                            if (GameState.currentArea === 'DAGASHI') note = "A4";
-                            if (GameState.currentArea === 'ARCADE') note = "G3";
-                            this.bgmSynth.triggerAttackRelease(note, "8n", time);
-                            index++;
-                        }
-                    }, "4n");
+                    this.bgmSynth.volume.value = -8;
 
                     Tone.Transport.bpm.value = 120;
                     Tone.Transport.start();
                     GameState.audioInitialized = true;
+                    if (GameState.started) this.playAreaBgm(GameState.currentArea, true);
                 } catch (e) {
                     GameState.audioInitialized = true;
                 }
@@ -725,24 +826,101 @@
                 this.synth.triggerAttackRelease(["E5", "G5", "C6"], "16n");
             }
 
-            playYoyo() {
-                if (!GameState.audioInitialized) return;
-                this.synth.triggerAttackRelease(["A3", "E4"], "16n");
+            playWeapon(kind) {
+                if (!GameState.audioInitialized || !this.synth) return;
+                if (kind === 'flute') {
+                    this.synth.triggerAttackRelease(["E5", "A5", "C6"], "16n");
+                } else {
+                    this.synth.triggerAttackRelease(["G3", "D4"], "16n");
+                    if (this.bgmSynth) this.bgmSynth.triggerAttackRelease("C2", "32n");
+                }
             }
 
-            playFlute() {
+            playTap() {
+                if (!GameState.audioInitialized || !this.synth) return;
+                try { this.synth.triggerAttackRelease("C7", "64n"); } catch (e) { /* ignore */ }
+            }
+
+            updateMutter(shouldPlay) {
+                const el = this.voices.mutter;
+                if (!el || !GameState.audioInitialized) return;
+                if (shouldPlay) {
+                    if (!this.mutterOn) {
+                        el.volume = 0.22;
+                        el.play().catch(() => {});
+                        this.mutterOn = true;
+                    }
+                } else if (this.mutterOn) {
+                    el.pause();
+                    el.currentTime = 0;
+                    this.mutterOn = false;
+                }
+            }
+
+            playBgmSting(theme) {
+                if (!this.synth || !this.bgmSynth) return;
+                const stings = {
+                    school: { notes: ["A3", "E4"], drum: "A2" },
+                    road: { notes: ["D4", "F4"], drum: "D2" },
+                    town: { notes: ["E4", "G4", "B4"], drum: "C3" },
+                    park: { notes: ["C3", "G3"], drum: "C2" }
+                };
+                const sting = stings[theme] || stings.school;
+                this.bgmSynth.triggerAttackRelease(sting.drum, "8n");
+                this.synth.triggerAttackRelease(sting.notes, "8n");
+            }
+
+            stopRoadBgm() {
+                if (!this.roadParts) return;
+                try { this.roadParts.loop.stop(); } catch (e) { /* ignore */ }
+                try { this.roadParts.loop.dispose(); } catch (e) { /* ignore */ }
+                try { this.roadParts.bass.dispose(); } catch (e) { /* ignore */ }
+                try { this.roadParts.lead.dispose(); } catch (e) { /* ignore */ }
+                this.roadParts = null;
+            }
+
+            startRoadBgm() {
+                this.stopRoadBgm();
+                if (!window.Tone) return;
+                const bass = new Tone.MembraneSynth().toDestination();
+                bass.volume.value = -18;
+                const lead = new Tone.Synth({ oscillator: { type: 'triangle' } }).toDestination();
+                lead.volume.value = -20;
+                const loop = new Tone.Loop((time) => {
+                    bass.triggerAttackRelease("E2", "8n", time);
+                    lead.triggerAttackRelease("B3", "16n", time + 0.32);
+                    lead.triggerAttackRelease("A3", "16n", time + 0.64);
+                }, "1n");
+                loop.start();
+                this.roadParts = { bass, lead, loop };
+            }
+
+            playAreaBgm(area, force) {
                 if (!GameState.audioInitialized) return;
-                this.synth.triggerAttackRelease(["G4", "B4", "D5"], "8n");
+                const theme = this.areaTheme[area] || 'school';
+                if (!force && theme === this.bgmTheme) return;
+                Object.keys(this.bgm).forEach((key) => {
+                    const el = this.bgm[key];
+                    el.pause();
+                    el.currentTime = 0;
+                });
+                this.stopRoadBgm();
+                this.playBgmSting(theme);
+                if (theme === 'road') {
+                    this.startRoadBgm();
+                } else {
+                    const next = this.bgm[theme];
+                    if (next) {
+                        next.currentTime = 0;
+                        next.play().catch(() => {});
+                    }
+                }
+                this.bgmTheme = theme;
             }
 
             playBreak() {
                 if (!GameState.audioInitialized) return;
                 this.synth.triggerAttackRelease(["C2", "G2", "C3"], "8n");
-            }
-
-            setCombatBpm(bpm) {
-                if (!GameState.audioInitialized || !window.Tone) return;
-                try { Tone.Transport.bpm.rampTo(bpm, 0.25); } catch (e) { /* ignore */ }
             }
         }
         const audio = new SoundEngine();
@@ -819,18 +997,18 @@
                 bgColor: "#2f4538",
                 bounds: { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT },
                 portals: [
-                    { x: WORLD_WIDTH / 2 - 60, y: 0, w: 120, h: 30, target: 'SCHOOL', spawnX: WORLD_WIDTH / 2, spawnY: WORLD_HEIGHT - 100 },
+                    { x: WORLD_WIDTH / 2 - 120, y: 200, w: 240, h: 88, target: 'SCHOOL', spawnX: WORLD_WIDTH / 2, spawnY: WORLD_HEIGHT - 100 },
                     { x: WORLD_WIDTH - 30, y: WORLD_HEIGHT / 2 - 60, w: 30, h: 120, target: 'SHOPPING', spawnX: 80, spawnY: WORLD_HEIGHT / 2 }
                 ],
                 decorations: [
                     { type: 'road_shoulder', side: 'left', x: 0, y: 280, w: 380, h: 720 },
                     { type: 'road_shoulder', side: 'right', x: 1220, y: 280, w: 380, h: 720 },
                     { type: 'road_carriageway', x: 380, y: 280, w: 840, h: 720 },
-                    { type: 'crosswalk', x: 380, y: 470, w: 840, h: 96 },
-                    { type: 'road_grass', x: 0, y: 0, w: WORLD_WIDTH, h: 280 },
+                    { type: 'crosswalk', x: 380, y: 438, w: 840, h: 176 },
+                    { type: 'road_grass', x: 0, y: 0, w: WORLD_WIDTH, h: 280, walkX: 680, walkW: 240 },
                     { type: 'road_grass', x: 0, y: 1000, w: WORLD_WIDTH, h: 200 },
-                    { type: 'traffic_light', x: 348, y: 452, side: 'left' },
-                    { type: 'traffic_light', x: 1252, y: 452, side: 'right' },
+                    { type: 'traffic_light', x: 348, y: 432, side: 'left' },
+                    { type: 'traffic_light', x: 1252, y: 432, side: 'right' },
                     { type: 'tree', x: 140, y: 520 },
                     { type: 'tree', x: 1460, y: 720 },
                     { type: 'tree', x: 160, y: 900 },
@@ -919,14 +1097,14 @@
                     { type: 'room_wall', x: 980, y: 1082, w: 400, h: 24 },
                     { type: 'room_wall', x: 220, y: 120, w: 24, h: 986 },
                     { type: 'room_wall', x: 1356, y: 120, w: 24, h: 986 },
-                    { type: 'cabinet', x: 320, y: 280, w: 140, h: 200 },
-                    { type: 'cabinet', x: 520, y: 280, w: 140, h: 200 },
-                    { type: 'cabinet', x: 920, y: 280, w: 140, h: 200 },
-                    { type: 'cabinet', x: 1120, y: 280, w: 140, h: 200 },
-                    { type: 'invader_cab', x: 680, y: 520, w: 240, h: 280 }
+                    { type: 'cabinet', x: 320, y: 280, w: 140, h: 200, game: 'frog' },
+                    { type: 'cabinet', x: 520, y: 280, w: 140, h: 200, game: 'pac' },
+                    { type: 'cabinet', x: 920, y: 280, w: 140, h: 200, game: 'race' },
+                    { type: 'cabinet', x: 1120, y: 280, w: 140, h: 200, game: 'punch' },
+                    { type: 'invader_cab', x: 680, y: 520, w: 240, h: 280, game: 'invaders' }
                 ],
                 npcs: [
-                    { id: 'arcade_clerk', name: 'アルバイト', x: 400, y: 860, sprite: '😼', behavior: 'wander', patrolRadius: 80, speed: 1.1, dialog: ["インベーダーは中央の筐体だ。スコアがそのまま小遣いになるぞ。"] }
+                    { id: 'arcade_clerk', name: 'アルバイト', x: 400, y: 860, sprite: '😼', behavior: 'wander', patrolRadius: 80, speed: 1.1, dialog: ["フロッグ、パック、レース、パンチ、インベーダー。どれもスコアが小遣いになるぞ。"] }
                 ]
             },
             PARK: {
@@ -977,7 +1155,12 @@
                 } else if (dec.type === 'fountain') {
                     rects.push({ x: dec.x - dec.r * 0.75, y: dec.y - dec.r * 0.35, w: dec.r * 1.5, h: dec.r * 0.9 });
                 } else if (dec.type === 'road_grass') {
-                    rects.push({ x: dec.x, y: dec.y, w: dec.w, h: dec.h });
+                    if (dec.walkW) {
+                        rects.push({ x: dec.x, y: dec.y, w: dec.walkX - dec.x, h: dec.h });
+                        rects.push({ x: dec.walkX + dec.walkW, y: dec.y, w: dec.x + dec.w - dec.walkX - dec.walkW, h: dec.h });
+                    } else {
+                        rects.push({ x: dec.x, y: dec.y, w: dec.w, h: dec.h });
+                    }
                 } else if (dec.type === 'lantern') {
                     rects.push({ x: dec.x - 12, y: dec.y - 8, w: 24, h: 20 });
                 } else if (dec.type === 'swing') {
@@ -1078,7 +1261,8 @@
 
             cycleWeapon() {
                 GameState.weapon = GameState.weapon === 'yoyo' ? 'flute' : 'yoyo';
-                showNotification(GameState.weapon === 'yoyo' ? 'ヨーヨー装備！' : 'フルート装備！');
+                const w = CombatKit.weaponOf(GameState.weapon);
+                showNotification(w.name);
                 updateHUD();
             }
 
@@ -1166,52 +1350,13 @@
 
             attack() {
                 if (this.isAttacking || this.isDashing) return;
+                const w = CombatKit.weaponOf(GameState.weapon);
                 this.isAttacking = true;
                 this.comboStep = (this.comboStep % 3) + 1;
-                this.attackTimer = GameState.weapon === 'flute' ? 12 : 16;
-
-                const dir = CombatKit.facingVec(this.facing);
-                const shot = CombatKit.muzzle(this, 28);
-                if (GameState.weapon === 'flute') {
-                    audio.playFlute();
-                    this.animationState = this.comboStep === 3 ? 'flute_shot' : 'flute_play';
-                    const speed = 7 + this.comboStep;
-                    projectiles.spawn({
-                        x: shot.x,
-                        y: shot.y,
-                        vx: dir.x * speed,
-                        vy: dir.y * speed,
-                        life: 42,
-                        kind: 'note',
-                        radius: 9 + this.comboStep * 2,
-                        damage: Math.floor(this.atk * (0.7 + this.comboStep * 0.25)),
-                        poise: 6 + this.comboStep * 3,
-                        owner: 'player',
-                        note: this.comboStep
-                    });
-                    return;
-                }
-
-                audio.playYoyo();
-                this.animationState = this.comboStep === 2 ? 'yoyo_spin_a' : 'yoyo_throw';
-                const speed = 9;
-                const yo = CombatKit.muzzle(this, 20);
-                projectiles.spawn({
-                    x: yo.x,
-                    y: yo.y,
-                    vx: dir.x * speed,
-                    vy: dir.y * speed,
-                    life: 34,
-                    kind: 'yoyo',
-                    phase: 'out',
-                    homeX: yo.x,
-                    homeY: yo.y,
-                    radius: 14,
-                    damage: Math.floor(this.atk * (0.85 + this.comboStep * 0.22)),
-                    poise: 10 + this.comboStep * 4,
-                    owner: 'player',
-                    pull: this.comboStep === 3
-                });
+                this.attackTimer = w.attackFrames;
+                this.animationState = w.attackAnim(this.comboStep);
+                audio.playWeapon(w.sfx);
+                CombatKit.fireAttack(w.id, this, projectiles, this.comboStep);
             }
 
             tryJustDodge() {
@@ -1234,8 +1379,6 @@
                 audio.playJust();
                 vfxManager.addNova(this.x, this.y);
                 vfxManager.addDamageText(this.x, this.y - 50, 'JUST!', '#67e8f9');
-                showNotification('ジャスト回避！ SP増加');
-                audio.setCombatBpm(comboRank.rank.bpm);
                 if (navigator.vibrate) navigator.vibrate(20);
                 return true;
             }
@@ -1259,61 +1402,20 @@
 
             useSkill() {
                 if (this.isAttacking || this.isDashing) return;
-                const cost = GameState.weapon === 'flute' ? 35 : 40;
-                if (this.sp < cost) {
-                    showNotification('SPが足りない！ ジャスト回避で貯めよう');
+                const w = CombatKit.weaponOf(GameState.weapon);
+                if (this.sp < w.skillCost) {
+                    showNotification('SPが足りない');
                     return;
                 }
-                this.sp -= cost;
+                this.sp -= w.skillCost;
                 this.isAttacking = true;
-                this.attackTimer = 26;
+                this.attackTimer = w.skillFrames;
+                this.animationState = w.skillAnim;
                 updateHUD();
-
-                if (GameState.weapon === 'flute') {
-                    this.animationState = 'flute_shot';
-                    audio.playFlute();
-                    const origin = CombatKit.muzzle(this);
-                    vfxManager.addNova(origin.x, origin.y);
-                    for (let i = 0; i < 8; i++) {
-                        const a = (Math.PI * 2 / 8) * i;
-                        projectiles.spawn({
-                            x: origin.x,
-                            y: origin.y,
-                            vx: Math.cos(a) * 6.5,
-                            vy: Math.sin(a) * 6.5,
-                            life: 36,
-                            kind: 'note',
-                            radius: 12,
-                            damage: Math.floor(this.atk * 1.4),
-                            poise: 18,
-                            owner: 'player',
-                            note: i
-                        });
-                    }
-                    return;
-                }
-
-                this.animationState = 'yoyo_spin_c';
-                audio.playYoyo();
-                const origin = CombatKit.muzzle(this);
+                audio.playWeapon(w.sfx);
+                const origin = CombatKit.fireSkill(w.id, this, projectiles);
                 vfxManager.addNova(origin.x, origin.y);
-                camera.zoomTo(1.18, 16);
-                projectiles.spawn({
-                    x: origin.x + 70,
-                    y: origin.y,
-                    vx: 0,
-                    vy: 0,
-                    life: 28,
-                    kind: 'yoyo',
-                    homeX: origin.x,
-                    homeY: origin.y,
-                    radius: 18,
-                    damage: Math.floor(this.atk * 1.6),
-                    poise: 28,
-                    owner: 'player',
-                    spin: true,
-                    pull: true
-                });
+                if (w.id === 'yoyo') camera.zoomTo(1.18, 16);
             }
 
             takeDamage(amount) {
@@ -1328,14 +1430,14 @@
                 audio.playHit();
 
                 comboRank.reset();
-                audio.setCombatBpm(120);
                 if (this.hp <= 0) {
-                    showNotification("倒れてしまった！保健室(学校)へ戻された...");
+                    showNotification("学校へ戻った");
                     this.hp = this.maxHp;
                     this.sp = Math.max(this.sp, 20);
                     GameState.currentArea = 'SCHOOL';
                     this.x = WORLD_WIDTH / 2;
                     this.y = WORLD_HEIGHT / 2;
+                    audio.playAreaBgm('SCHOOL');
                 }
             }
 
@@ -1507,24 +1609,6 @@
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
                 ctx.fillText(this.def.name, this.x, this.y - h - 6 + (anim.bob || 0));
-
-                const dist = Math.hypot(player.x - this.x, player.y - this.y);
-                if (dist < CHAR_TALK_RANGE) {
-                    ctx.fillStyle = '#10b981';
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 2;
-                    const bx = this.x - 40, by = this.y - h - 36, bw = 80, bh = 24;
-                    ctx.beginPath();
-                    ctx.roundRect(bx, by, bw, bh, 8);
-                    ctx.fill();
-                    ctx.stroke();
-
-                    ctx.fillStyle = '#ffffff';
-                    ctx.font = 'bold 11px sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillText('💬 [E] 話す', this.x, this.y - h - 24);
-                }
                 ctx.restore();
             }
         }
@@ -1769,7 +1853,7 @@
                     player.x = portal.spawnX;
                     player.y = portal.spawnY;
                     GameState.portalLock = 24;
-                    showNotification(`${MAP_AREAS[portal.target].name} に移動しました`);
+                    audio.playAreaBgm(portal.target);
                     updateHUD();
                 }
             });
@@ -1784,11 +1868,21 @@
                     }
                 }
                 if (GameState.currentArea === 'ARCADE') {
-                    const cab = currentMap.decorations.find((d) => d.type === 'invader_cab');
-                    if (cab && Math.hypot(player.x - (cab.x + cab.w / 2), player.y - (cab.y + cab.h / 2)) < 150) {
+                    let best = null;
+                    let bestD = 999;
+                    currentMap.decorations.forEach((cab) => {
+                        if (!cab.game) return;
+                        const reach = cab.type === 'invader_cab' ? 150 : 120;
+                        const d = Math.hypot(player.x - (cab.x + cab.w / 2), player.y - (cab.y + cab.h * 0.85));
+                        if (d < reach && d < bestD) {
+                            bestD = d;
+                            best = cab;
+                        }
+                    });
+                    if (best) {
                         keys['KeyE'] = false;
                         keys['InteractTrigger'] = false;
-                        startInvaders();
+                        startArcade(best.game);
                     }
                 }
             }
@@ -1807,10 +1901,10 @@
                             const item = GameState.inventory.find(i => i.id === npc.shopItem);
                             if (item) item.count++;
                             else GameState.inventory.push({ id: 'yakisoba_pan', name: '焼きそばパン', count: 1, icon: '🥖', hpRestore: 40, desc: 'HPを40回復。' });
-                            showNotification("焼きそばパンを購入しました！");
+                            showNotification("焼きそばパン");
                             updateHUD();
                         } else {
-                            showNotification("お金が足りないよ！");
+                            showNotification("足りない");
                         }
                     } else {
                         const dialogTexts = typeof npc.dialog === 'function' ? npc.dialog() : npc.dialog;
@@ -1834,7 +1928,7 @@
 
         function playLottery() {
             if (GameState.money < ShopKit.LOTTERY_COST) {
-                showNotification('20円必要だよ！');
+                showNotification('20円');
                 return;
             }
             GameState.money -= ShopKit.LOTTERY_COST;
@@ -1850,21 +1944,22 @@
             showDialog('くじ引き', [prize.title, prize.text]);
         }
 
-        function startInvaders() {
-            GameState.minigame = 'invaders';
-            invaderGame.start();
-            showNotification('インベーダー始動！ Jで発射、Eで終了');
+        function startArcade(id) {
+            const game = arcadeGames[id];
+            if (!game) return;
+            GameState.minigame = id;
+            game.start();
         }
 
-        function finishInvaders() {
-            const score = invaderGame.quit();
+        function finishArcade() {
+            const game = currentArcade();
+            if (!game) return;
+            const score = game.quit();
             GameState.minigame = null;
             const payout = Math.floor(score / 5);
             if (payout > 0) {
                 GameState.money += payout;
-                showNotification(`スコア${score}！ ${payout}円ゲット`);
-            } else {
-                showNotification('また挑戦してくれよな');
+                showNotification(`${payout}円`);
             }
             updateHUD();
         }
@@ -1889,7 +1984,7 @@
             }
         }
 
-        document.getElementById('dialog-next-btn').addEventListener('click', advanceDialog);
+        bindTap(document.getElementById('dialog-next-btn'), advanceDialog);
 
         // -------------------------------------------------------------
         // PROGRAM 7 & 10: HUD, INVENTORY & NOTIFICATION SYSTEM
@@ -1906,7 +2001,7 @@
             document.getElementById('location-name').innerText = MAP_AREAS[GameState.currentArea].name;
             document.getElementById('sp-text').innerText = `${player.sp} / ${player.maxSp}`;
             document.getElementById('sp-bar').style.width = `${(player.sp / player.maxSp) * 100}%`;
-            document.getElementById('weapon-text').innerText = GameState.weapon === 'flute' ? 'フルート' : 'ヨーヨー';
+            document.getElementById('weapon-text').innerText = CombatKit.weaponOf(GameState.weapon).name;
 
             const hud = document.getElementById('combo-hud');
             if (comboRank.count > 0) {
@@ -1926,13 +2021,13 @@
 
             // クエストトラッカー更新
             const questTexts = {
-                SCHOOL: "学校のグラウンドで練習し、南の校門から道路へ出よう。",
-                ROAD: "道路を東に進み、商店街へ向かおう。",
-                SHOPPING: "店の入口から中へ。南の道は公園だ。",
-                BAKERY: "焼きそばパンを買って体力を整えよう。南が出口。",
-                DAGASHI: "20円でくじ引き。南が出口。",
-                ARCADE: "中央の筐体でインベーダー。南が出口。",
-                PARK: "動く金次郎銅像を倒し、暗黒校長を討て！"
+                SCHOOL: "校門",
+                ROAD: "商店街",
+                SHOPPING: "公園",
+                BAKERY: "出口",
+                DAGASHI: "出口",
+                ARCADE: "出口",
+                PARK: "校長"
             };
             document.getElementById('quest-tracker-text').innerText = questTexts[GameState.currentArea] || "";
 
@@ -1979,12 +2074,11 @@
                     </div>
                     <button class="use-btn bg-pink-500 hover:bg-pink-400 text-white font-bold text-xs px-3 py-1.5 rounded-xl">使用</button>
                 `;
-                itemEl.querySelector('.use-btn').addEventListener('click', () => {
+                bindTap(itemEl.querySelector('.use-btn'), () => {
                     if (item.count > 0) {
                         item.count--;
                         player.hp = Math.min(player.maxHp, player.hp + item.hpRestore);
                         vfxManager.addDamageText(player.x, player.y - 30, `+${item.hpRestore} HP`, '#4ade80');
-                        showNotification(`${item.name} を使ってHPを回復した！`);
                         updateHUD();
                         document.getElementById('inventory-modal').classList.add('hidden');
                     }
@@ -1995,7 +2089,7 @@
             document.getElementById('inventory-modal').classList.remove('hidden');
         }
 
-        document.getElementById('close-inventory-btn').addEventListener('click', () => {
+        bindTap(document.getElementById('close-inventory-btn'), () => {
             document.getElementById('inventory-modal').classList.add('hidden');
         });
 
@@ -2036,6 +2130,12 @@
         }, { passive: false });
         document.addEventListener('dblclick', (e) => e.preventDefault());
         document.addEventListener('contextmenu', (e) => e.preventDefault());
+        document.addEventListener('selectstart', (e) => e.preventDefault());
+        document.addEventListener('gesturestart', (e) => e.preventDefault());
+        document.addEventListener('selectionchange', () => {
+            const sel = window.getSelection();
+            if (sel && sel.rangeCount) sel.removeAllRanges();
+        });
         document.addEventListener('touchmove', (e) => {
             if (e.target.closest('[data-scrollable]')) return;
             e.preventDefault();
@@ -2048,7 +2148,8 @@
             const fire = (e) => {
                 e.preventDefault();
                 el.classList.add('is-pressed');
-                if (navigator.vibrate) navigator.vibrate(15);
+                if (navigator.vibrate) navigator.vibrate(18);
+                audio.playTap();
                 handler(e);
             };
             const release = () => el.classList.remove('is-pressed');
@@ -2060,12 +2161,14 @@
 
         bindTap(document.getElementById('btn-interact'), () => {
             keys['InteractTrigger'] = true;
-            if (GameState.minigame === 'invaders') return;
+            if (GameState.minigame) return;
             checkPortalsAndInteractions();
         });
         bindTap(document.getElementById('btn-attack'), () => {
-            if (GameState.minigame === 'invaders') invaderGame.shoot();
-            else player.attack();
+            const arcade = currentArcade();
+            if (arcade && arcade.shoot) arcade.shoot();
+            else if (arcade && arcade.swing) arcade.swing();
+            else if (!GameState.minigame) player.attack();
         });
         bindTap(document.getElementById('btn-dash'), () => { if (!GameState.minigame) player.dash(); });
         bindTap(document.getElementById('btn-skill'), () => { if (!GameState.minigame) player.useSkill(); });
@@ -2080,7 +2183,8 @@
                 btn.setPointerCapture(e.pointerId);
                 btn.classList.add('is-pressed');
                 keys[key] = true;
-                if (navigator.vibrate) navigator.vibrate(12);
+                if (navigator.vibrate) navigator.vibrate(16);
+                audio.playTap();
             };
             const up = () => {
                 btn.classList.remove('is-pressed');
@@ -2184,6 +2288,28 @@
                     }
                 }
             }
+            if (!dec.walkW) return;
+            const px = dec.walkX;
+            const pw = dec.walkW;
+            ctx.fillStyle = '#9aa3ad';
+            ctx.fillRect(px, dec.y, pw, dec.h);
+            ctx.fillStyle = '#b7bec7';
+            for (let ty = dec.y; ty < dec.y + dec.h; ty += 20) {
+                ctx.fillRect(px + 8, ty, pw - 16, 2);
+            }
+            ctx.fillStyle = '#64748b';
+            ctx.fillRect(px, dec.y, 8, dec.h);
+            ctx.fillRect(px + pw - 8, dec.y, 8, dec.h);
+            const gateY = dec.y + dec.h - 64;
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(px + 10, gateY, 18, 56);
+            ctx.fillRect(px + pw - 28, gateY, 18, 56);
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(px + 70, gateY + 8, pw - 140, 22);
+            ctx.fillStyle = '#e2e8f0';
+            ctx.font = 'bold 12px DotGothic16, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('学校', px + pw / 2, gateY + 24);
         }
 
         function drawRoadShoulder(ctx, dec) {
@@ -2205,8 +2331,8 @@
             ctx.fillRect(isLeft ? curbX + 2 : curbX, dec.y, 4, dec.h);
 
             const tactX = isLeft ? dec.x + dec.w - 72 : dec.x + 12;
-            const tactY = 470;
-            const tactH = 96;
+            const tactY = 438;
+            const tactH = 176;
             ctx.fillStyle = '#fbbf24';
             for (let ty = tactY; ty < tactY + tactH; ty += 12) {
                 for (let tx = tactX; tx < tactX + 56; tx += 12) {
@@ -2231,21 +2357,28 @@
             const centerX = dec.x + dec.w / 2 - 2;
             ctx.fillStyle = '#fbbf24';
             for (let dy = dec.y + 12; dy < dec.y + dec.h; dy += 40) {
+                if (dy + 22 > 438 && dy < 614) continue;
                 ctx.fillRect(centerX, dy, 4, 22);
             }
         }
 
         function drawCrosswalk(ctx, dec) {
-            ctx.fillStyle = '#ffffff';
-            const stripeH = 12;
-            const gap = 16;
-            for (let sy = dec.y + 10; sy < dec.y + dec.h - 10; sy += stripeH + gap) {
-                ctx.fillRect(dec.x + 20, sy, dec.w - 40, stripeH);
-            }
+            const { x, y, w, h } = dec;
+            ctx.fillStyle = '#3a4452';
+            ctx.fillRect(x, y, w, h);
 
-            ctx.fillStyle = 'rgba(248,250,252,0.55)';
-            ctx.fillRect(dec.x + 20, dec.y + 4, dec.w - 40, 4);
-            ctx.fillRect(dec.x + 20, dec.y + dec.h - 8, dec.w - 40, 4);
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(x + 10, y + 4, w - 20, 8);
+            ctx.fillRect(x + 10, y + h - 12, w - 20, 8);
+
+            const inset = 28;
+            const bar = 8;
+            const gap = 6;
+            const top = y + 18;
+            const bottom = y + h - 18;
+            for (let sy = top; sy + bar <= bottom; sy += bar + gap) {
+                ctx.fillRect(x + inset, sy, w - inset * 2, bar);
+            }
         }
 
         function drawTrafficLight(ctx, dec) {
@@ -2501,15 +2634,163 @@
             return items;
         }
 
+        const GUIDE_PRIMARY = {
+            SCHOOL: 'ROAD',
+            ROAD: 'SHOPPING',
+            SHOPPING: 'PARK',
+            BAKERY: 'SHOPPING',
+            DAGASHI: 'SHOPPING',
+            ARCADE: 'SHOPPING'
+        };
+
+        function currentGuide() {
+            const area = GameState.currentArea;
+            const map = MAP_AREAS[area];
+            const target = GUIDE_PRIMARY[area];
+            if (!map || !target) return null;
+            const portal = map.portals.find((p) => p.target === target);
+            if (!portal) return null;
+            return {
+                x: portal.x + portal.w / 2,
+                y: portal.y + portal.h / 2,
+                w: portal.w,
+                h: portal.h
+            };
+        }
+
+        function drawGuideWorld(ctx) {
+            const g = currentGuide();
+            if (!g) return;
+            const bob = Math.sin(performance.now() / 220) * 7;
+            const down = g.h <= g.w && g.y > WORLD_HEIGHT / 2;
+            const up = g.h <= g.w && g.y <= WORLD_HEIGHT / 2;
+            const right = g.h > g.w && g.x > WORLD_WIDTH / 2;
+            ctx.save();
+            ctx.translate(g.x, g.y + bob);
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            if (right) {
+                ctx.moveTo(22, 0);
+                ctx.lineTo(-8, -14);
+                ctx.lineTo(-8, 14);
+            } else if (up) {
+                ctx.moveTo(0, -22);
+                ctx.lineTo(-14, 8);
+                ctx.lineTo(14, 8);
+            } else if (down) {
+                ctx.moveTo(0, 22);
+                ctx.lineTo(-14, -8);
+                ctx.lineTo(14, -8);
+            } else {
+                ctx.moveTo(-22, 0);
+                ctx.lineTo(8, -14);
+                ctx.lineTo(8, 14);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawGuideHud(ctx, view) {
+            const g = currentGuide();
+            if (!g) return;
+            const sx = (g.x - camera.x) * camera.zoom;
+            const sy = (g.y - camera.y) * camera.zoom;
+            const pad = 34;
+            if (sx > pad && sx < view.w - pad && sy > pad && sy < view.h - pad) return;
+            const cx = view.w / 2;
+            const cy = view.h / 2;
+            const dx = sx - cx;
+            const dy = sy - cy;
+            const mx = view.w / 2 - 36;
+            const my = view.h / 2 - 40;
+            let t = 1;
+            if (Math.abs(dx) > mx) t = Math.min(t, mx / Math.abs(dx));
+            if (Math.abs(dy) > my) t = Math.min(t, my / Math.abs(dy));
+            const ang = Math.atan2(dy, dx);
+            ctx.save();
+            ctx.translate(cx + dx * t, cy + dy * t);
+            ctx.rotate(ang);
+            ctx.fillStyle = '#facc15';
+            ctx.beginPath();
+            ctx.moveTo(16, 0);
+            ctx.lineTo(-10, -11);
+            ctx.lineTo(-10, 11);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function nearbyInteract() {
+            if (GameState.minigame) return { kind: 'quit' };
+            const area = GameState.currentArea;
+            const map = MAP_AREAS[area];
+            let best = null;
+            let bestD = CHAR_TALK_RANGE;
+            mapNpcs.forEach((mob) => {
+                if (mob.area !== area) return;
+                const d = Math.hypot(player.x - mob.x, player.y - mob.y);
+                if (d < bestD) {
+                    bestD = d;
+                    best = { kind: 'npc' };
+                }
+            });
+            if (area === 'DAGASHI') {
+                const kuji = map.decorations.find((d) => d.type === 'kuji');
+                if (kuji) {
+                    const d = Math.hypot(player.x - (kuji.x + kuji.w / 2), player.y - (kuji.y + kuji.h / 2));
+                    if (d < 140) best = { kind: 'kuji' };
+                }
+            }
+            if (area === 'ARCADE') {
+                map.decorations.forEach((cab) => {
+                    if (!cab.game) return;
+                    const reach = cab.type === 'invader_cab' ? 150 : 120;
+                    const d = Math.hypot(player.x - (cab.x + cab.w / 2), player.y - (cab.y + cab.h * 0.85));
+                    if (d < reach && d < (best && best.kind === 'game' ? bestD : 999)) {
+                        bestD = d;
+                        best = { kind: 'game' };
+                    }
+                });
+            }
+            return best;
+        }
+
+        function updatePrompts() {
+            const btn = document.getElementById('btn-interact');
+            const cap = btn && btn.querySelector('span');
+            const hit = nearbyInteract();
+            if (btn) btn.classList.toggle('is-ready', !!hit);
+            if (cap) {
+                if (!hit) cap.textContent = '話す';
+                else if (hit.kind === 'kuji') cap.textContent = 'くじ';
+                else if (hit.kind === 'game') cap.textContent = '遊ぶ';
+                else if (hit.kind === 'quit') cap.textContent = 'やめる';
+                else cap.textContent = '話す';
+            }
+            const dash = document.getElementById('btn-dash');
+            if (dash) {
+                const just = enemies.some((e) => e.isAlive && e.area === GameState.currentArea && e.inJustWindow);
+                dash.classList.toggle('is-just', just);
+            }
+        }
+
         // メインループ
         function gameLoop() {
             if (GameState.started && !GameState.paused) {
-                if (GameState.minigame === 'invaders') {
-                    invaderGame.update(keys);
+                const arcade = currentArcade();
+                if (arcade) {
+                    arcade.update(keys);
                     if (keys['KeyE'] || keys['InteractTrigger']) {
                         keys['KeyE'] = false;
                         keys['InteractTrigger'] = false;
-                        finishInvaders();
+                        finishArcade();
                     }
                     ctx.setTransform(1, 0, 0, 1, 0, 0);
                     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -2525,7 +2806,8 @@
                     ctx.restore();
                     const view = cssView();
                     ctx.setTransform(canvasDpr(), 0, 0, canvasDpr(), 0, 0);
-                    invaderGame.draw(ctx, view.w, view.h);
+                    arcade.draw(ctx, view.w, view.h);
+                    updatePrompts();
                     requestAnimationFrame(gameLoop);
                     return;
                 }
@@ -2546,6 +2828,7 @@
                 }
                 camera.follow(player);
                 updateHUD();
+                audio.updateMutter(GameState.currentArea === 'PARK' && enemies.some((e) => e.isBoss && e.isAlive));
 
                 ctx.setTransform(1, 0, 0, 1, 0, 0);
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -2564,11 +2847,14 @@
                 renderMapStructuresFront(ctx, GameState.currentArea);
                 projectiles.draw(ctx);
                 vfxManager.draw(ctx);
+                drawGuideWorld(ctx);
 
                 ctx.restore();
                 const view = cssView();
                 ctx.setTransform(canvasDpr(), 0, 0, canvasDpr(), 0, 0);
                 combatFeel.drawOverlay(ctx, view.w, view.h);
+                drawGuideHud(ctx, view);
+                updatePrompts();
             }
 
             requestAnimationFrame(gameLoop);
@@ -2578,15 +2864,18 @@
         bindTap(document.getElementById('start-btn'), () => {
             audio.init();
             GameState.started = true;
+            audio.playAreaBgm(GameState.currentArea, true);
             document.getElementById('start-overlay').classList.add('hidden');
-            showNotification("冒険開始！赤い予兆中に回避でJUST。Qで武器切替。");
         });
 
         // 特徴モーダル表示
-        document.getElementById('show-features-btn').addEventListener('click', () => {
-            document.getElementById('features-modal').classList.remove('hidden');
-        });
-        document.getElementById('close-features-btn').addEventListener('click', () => {
+        const featuresBtn = document.getElementById('show-features-btn');
+        if (featuresBtn) {
+            featuresBtn.addEventListener('click', () => {
+                document.getElementById('features-modal').classList.remove('hidden');
+            });
+        }
+        bindTap(document.getElementById('close-features-btn'), () => {
             document.getElementById('features-modal').classList.add('hidden');
         });
 

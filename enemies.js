@@ -224,7 +224,6 @@
             camera.shake(6 + (rank.name === 'S' ? 6 : 0));
             player.gainSp(3);
             comboRank.registerHit(1);
-            audio.setCombatBpm(rank.bpm);
 
             if (this.poise <= 0 && this.broken <= 0) {
                 this.broken = this.getBreakDuration();
