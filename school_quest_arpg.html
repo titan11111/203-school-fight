@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>スクールクエスト - 桜舞う街の放課後ARPG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DotGothic16&family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap');
+        
+        *, *::before, *::after {
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            user-select: none;
+            touch-action: none;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            overscroll-behavior: none;
+        }
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #0f172a;
+        }
+        .btn-action {
+            min-height: 56px;
+            transition: transform 0.08s ease, opacity 0.08s ease, filter 0.08s ease, box-shadow 0.08s ease;
+            will-change: transform;
+            touch-action: manipulation;
+            box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
+        }
+        .btn-action:active, .btn-action.is-pressed {
+            transform: scale(0.92);
+            opacity: 0.88;
+        }
+        
+        .pixel-font {
+            font-family: 'DotGothic16', sans-serif;
+        }
+
+        /* カスタムスクロールバー */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(236, 72, 153, 0.5);
+            border-radius: 3px;
+        }
+
+        /* レトロなテキストシャドウ */
+        .text-glow {
+            text-shadow: 0 0 8px rgba(244, 114, 182, 0.6), 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="text-white h-screen w-screen flex flex-col justify-between items-center relative select-none">
+
+    <!-- トップ HUD バー -->
+    <div id="hud-top" class="absolute top-3 left-3 right-3 z-20 flex justify-between items-start pointer-events-none">
+        <!-- プレイヤー ステータス -->
+        <div class="glass-panel p-3 rounded-2xl flex items-center gap-4 border border-pink-500/30 pointer-events-auto min-w-[280px]">
+            <div class="relative">
+                <div id="player-avatar" class="w-12 h-12 rounded-xl bg-gradient-to-tr from-pink-500 to-indigo-500 flex items-center justify-center font-bold text-xl border-2 border-white/40 shadow-lg">
+                    生
+                </div>
+                <div id="player-level" class="absolute -bottom-2 -right-2 bg-yellow-400 text-slate-900 font-extrabold text-xs px-2 py-0.5 rounded-full border border-black shadow">
+                    Lv.1
+                </div>
+            </div>
+            
+            <div class="flex-1 space-y-1">
+                <div class="flex justify-between text-xs font-bold px-0.5">
+                    <span class="text-pink-300">HP</span>
+                    <span id="hp-text" class="text-slate-200">100 / 100</span>
+                </div>
+                <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden border border-slate-700/50 p-0.5">
+                    <div id="hp-bar" class="bg-gradient-to-r from-red-500 to-pink-500 h-full rounded-full transition-all duration-200" style="width: 100%"></div>
+                </div>
+
+                <div class="flex justify-between text-xs font-bold px-0.5 pt-0.5">
+                    <span class="text-cyan-300">EXP</span>
+                    <span id="exp-text" class="text-slate-200">0 / 50</span>
+                </div>
+                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700/50 p-0.5">
+                    <div id="exp-bar" class="bg-gradient-to-r from-cyan-400 to-blue-500 h-full rounded-full transition-all duration-200" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ミニマップ & 現在地 -->
+        <div class="glass-panel p-2.5 rounded-2xl border border-indigo-500/30 pointer-events-auto flex flex-col items-end gap-1">
+            <div class="flex items-center gap-2 text-xs font-bold text-amber-300">
+                <i data-lucide="map-pin" class="w-4 h-4 text-pink-400"></i>
+                <span id="location-name">北校舎前グラウンド</span>
+            </div>
+            <div class="relative w-28 h-20 bg-slate-900/90 rounded-xl overflow-hidden border border-slate-700">
+                <canvas id="minimap-canvas" class="w-full h-full"></canvas>
+            </div>
+            <div class="flex items-center gap-3 text-[11px] font-semibold text-slate-300 mt-0.5">
+                <span class="text-yellow-400 flex items-center gap-1"><i data-lucide="coins" class="w-3.5 h-3.5"></i><span id="money-text">0</span> 円</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 画面中央：ゲームキャンバス -->
+    <div class="relative w-full h-full flex items-center justify-center bg-black">
+        <canvas id="game-canvas" class="w-full h-full block"></canvas>
+
+        <!-- スタート＆ポーズオーバーレイ -->
+        <div id="start-overlay" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center z-40 p-6 text-center">
+            <div class="max-w-md space-y-6">
+                <div class="inline-block px-4 py-1.5 rounded-full bg-pink-500/20 border border-pink-500/40 text-pink-300 text-xs font-bold tracking-widest uppercase">
+                    2D Action RPG Prototype
+                </div>
+                <h1 class="text-4xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-purple-300 to-indigo-400 text-glow">
+                    スクールクエスト<br><span class="text-2xl md:text-3xl font-bold text-white">〜放課後の決戦〜</span>
+                </h1>
+                <p class="text-slate-300 text-sm leading-relaxed">
+                    校門を抜け、夕暮れの街道と商店街を走り抜けろ！<br>
+                    公園に降臨した<span class="text-red-400 font-bold">「暗黒校長」</span>を倒し、学校の平和を取り戻せ。
+                </p>
+
+                <!-- 10個のシステム紹介ボタン -->
+                <button id="show-features-btn" class="text-xs text-cyan-400 hover:text-cyan-300 underline font-semibold">
+                    ⚡ 搭載されている10のプログラミングシステムを見る
+                </button>
+
+                <div class="pt-2">
+                    <button id="start-btn" class="btn-action w-full py-4 px-8 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-400 hover:to-purple-500 text-white font-black text-xl rounded-2xl shadow-lg border border-pink-300/40 transform hover:scale-105 transition">
+                        ゲームスタート (SPACE / Tap)
+                    </button>
+                </div>
+                
+                <div class="text-xs text-slate-400 bg-slate-900/60 p-3 rounded-xl border border-slate-800 text-left space-y-1">
+                    <p class="font-bold text-slate-200">【操作方法】</p>
+                    <p>・移動: <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">WASD</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">方向キー</kbd> (画面タップ可)</p>
+                    <p>・攻撃 (3段コンボ): <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">J</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Z</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Space</kbd></p>
+                    <p>・ダッシュ回避: <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">K</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">Shift</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">X</kbd></p>
+                    <p>・必殺技スキル: <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">L</kbd> / <kbd class="px-1.5 py-0.5 bg-slate-800 rounded">C</kbd> (要SP)</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 10のシステム解説モーダル -->
+        <div id="features-modal" class="hidden absolute inset-0 bg-slate-950/90 backdrop-blur-lg z-50 p-6 flex flex-col justify-center items-center">
+            <div class="max-w-2xl w-full glass-panel p-6 rounded-3xl max-h-[85vh] flex flex-col border border-cyan-500/30">
+                <div class="flex justify-between items-center pb-4 border-b border-slate-700">
+                    <h2 class="text-xl font-black text-cyan-300 flex items-center gap-2">
+                        <i data-lucide="cpu" class="w-6 h-6"></i> 10のARPGプログラム構成要素
+                    </h2>
+                    <button id="close-features-btn" class="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto my-4 space-y-3 text-xs text-slate-300 pr-2">
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">1. シームレス・エリアカメラ遷移マネージャー</span>
+                        <p class="mt-1 text-slate-400">学校・道路・商店街・公園の4マップ間の動的補間移動とバウンダリ衝突の滑らかなダイナミックカメラ追従制御。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">2. 3段攻撃＆ダッシュ・ステートエンジン</span>
+                        <p class="mt-1 text-slate-400">コンボフレームキャンセル、ダッシュ中の無敵属性、硬直時間を最適化したステートマシン処理。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">3. アクティブ・ヒットボックス＆iFrameマトリックス</span>
+                        <p class="mt-1 text-slate-400">幾何学的扇状/矩形攻撃判定と、被弾後の無敵時間(iFrames)・ベクトルノックバックリアルタイム物理計算。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">4. 動的VFX＆残像エミッター</span>
+                        <p class="mt-1 text-slate-400">ダッシュ残像、斬撃スラッシュエフェクト、ヒットスパーク、レベルアップ時パーティクル群のリアルタイム演算。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">5. 敵FSM AI＆ボス多段形態制御</span>
+                        <p class="mt-1 text-slate-400">敵の視界(FOV)索敵、追撃、攻撃クールダウンおよびラスボスのHP連動第2形態弾幕パターン移行処理。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">6. インタラクティブ・クエスト＆フラグシステム</span>
+                        <p class="mt-1 text-slate-400">校門の鍵解錠、商店街のパワーアップ購入、公園のボス打倒など目標の動的トリガー検出。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">7. インベントリ＆装備・能力計算ステータス</span>
+                        <p class="mt-1 text-slate-400">武器（竹刀/物差し）交換による攻撃範囲・威力の動的反映と回復アイテム（焼きそばパン）のストック制御。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">8. Tone.js プロシージャル・オーディオエンジン</span>
+                        <p class="mt-1 text-slate-400">アセット読み込み不要でSynth音源からマップごとの背景音楽（BGM）および打撃・スキル効果音(SE)を動的生成。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">9. フローティング Combat テキスト＆UIポータル</span>
+                        <p class="mt-1 text-slate-400">ダメージ数値、回復量、CRITICALヒットの空中浮遊フェード描画エンジン。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">10. オートセーブ＆モバイルVirtual Pad制御</span>
+                        <p class="mt-1 text-slate-400">localStorageへのゲーム進行度の自動書き込みおよびタッチデバイス用バーチャル操作インターフェース統合。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 会話・ダイアログボックス -->
+        <div id="dialog-box" class="hidden absolute bottom-20 left-4 right-4 md:left-1/4 md:right-1/4 glass-panel p-4 rounded-2xl border-2 border-pink-500/50 z-30 shadow-2xl flex gap-4 items-center">
+            <div id="dialog-speaker-img" class="w-14 h-14 rounded-xl bg-indigo-600 border-2 border-white/60 flex items-center justify-center font-extrabold text-2xl shrink-0">
+                👤
+            </div>
+            <div class="flex-1 space-y-1">
+                <div id="dialog-speaker-name" class="font-bold text-pink-300 text-sm">担任の先生</div>
+                <div id="dialog-text" class="text-xs md:text-sm text-slate-100 leading-relaxed font-medium">
+                    学校の外は危険だぞ！公園の校長先生の様子がおかしくなってしまったんだ…！
+                </div>
+            </div>
+            <button id="dialog-next-btn" class="bg-pink-500 hover:bg-pink-400 text-white font-bold text-xs px-3 py-2 rounded-xl self-end shrink-0">
+                次へ ▶
+            </button>
+        </div>
+
+        <!-- 通知メッセージポップアップ -->
+        <div id="notification-toast" class="absolute top-20 left-1/2 transform -translate-x-1/2 bg-amber-400/90 text-slate-950 font-black px-4 py-2 rounded-full border border-white shadow-xl text-xs z-30 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-2">
+            <i data-lucide="bell" class="w-4 h-4"></i> <span id="toast-text">通知テスト</span>
+        </div>
+    </div>
+
+    <!-- ボトム アクション & インベントリ バー -->
+    <div class="absolute bottom-3 left-3 right-3 z-20 flex justify-between items-end pointer-events-none">
+        <!-- クエストターゲット HUD -->
+        <div class="glass-panel p-3 rounded-2xl border border-purple-500/30 pointer-events-auto max-w-[260px]">
+            <div class="flex items-center gap-2 text-xs font-extrabold text-pink-400">
+                <i data-lucide="compass" class="w-4 h-4"></i> 現在の目的
+            </div>
+            <div id="quest-tracker-text" class="text-xs font-semibold text-slate-200 mt-1 leading-snug">
+                学校のグラウンドで練習し、南の校門から道路へ出よう。
+            </div>
+        </div>
+
+        <!-- アクションボタン (デスクトップガイド 兼 タッチ入力ボタン) -->
+        <div class="flex items-center gap-2 pointer-events-auto">
+            <button id="btn-inventory" class="btn-action glass-panel p-3 rounded-2xl border border-slate-600 hover:border-pink-400 flex flex-col items-center gap-1 text-slate-200 active:scale-95">
+                <i data-lucide="briefcase" class="w-5 h-5 text-amber-400"></i>
+                <span class="text-[10px] font-bold">もちもの</span>
+            </button>
+            <button id="btn-interact" class="btn-action bg-gradient-to-tr from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 p-3.5 rounded-2xl border border-white/40 shadow-lg text-white font-black flex flex-col items-center gap-1 active:scale-95 min-w-[65px]">
+                <i data-lucide="message-circle" class="w-5 h-5 text-emerald-200"></i>
+                <span class="text-[10px]">話す [E]</span>
+            </button>
+            <button id="btn-attack" class="btn-action bg-gradient-to-tr from-red-600 to-pink-500 hover:from-red-500 hover:to-pink-400 p-4 rounded-2xl border border-white/40 shadow-lg text-white font-black flex flex-col items-center gap-1 active:scale-95 min-w-[70px]">
+                <i data-lucide="sword" class="w-6 h-6"></i>
+                <span class="text-[10px]">攻撃 [J]</span>
+            </button>
+            <button id="btn-dash" class="btn-action bg-gradient-to-tr from-cyan-600 to-blue-500 hover:from-cyan-500 hover:to-blue-400 p-3.5 rounded-2xl border border-white/40 shadow-lg text-white font-black flex flex-col items-center gap-1 active:scale-95 min-w-[65px]">
+                <i data-lucide="zap" class="w-5 h-5"></i>
+                <span class="text-[10px]">回避 [K]</span>
+            </button>
+            <button id="btn-skill" class="btn-action bg-gradient-to-tr from-purple-600 to-indigo-500 hover:from-purple-500 hover:to-indigo-400 p-3.5 rounded-2xl border border-white/40 shadow-lg text-white font-black flex flex-col items-center gap-1 active:scale-95 min-w-[65px]">
+                <i data-lucide="sparkles" class="w-5 h-5 text-yellow-300"></i>
+                <span class="text-[10px]">必殺 [L]</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- インベントリ モーダル -->
+    <div id="inventory-modal" class="hidden absolute inset-0 bg-slate-950/80 backdrop-blur-md z-40 p-6 flex flex-col items-center justify-center">
+        <div class="glass-panel p-6 rounded-3xl max-w-md w-full border border-pink-500/30 space-y-4">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-700">
+                <h3 class="text-lg font-bold text-pink-300 flex items-center gap-2">
+                    <i data-lucide="backpack" class="w-5 h-5"></i> 所持品＆装備
+                </h3>
+                <button id="close-inventory-btn" class="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-3">
+                <div class="text-xs font-bold text-slate-400">現在のアタッチ装備</div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div id="equip-weapon" class="bg-slate-900/90 p-3 rounded-2xl border border-slate-700 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xl">
+                            🎋
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-amber-300">竹刀</div>
+                            <div class="text-[10px] text-slate-400">攻撃力 +15</div>
+                        </div>
+                    </div>
+                    <div id="equip-armor" class="bg-slate-900/90 p-3 rounded-2xl border border-slate-700 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-xl">
+                            👔
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-blue-300">学ラン</div>
+                            <div class="text-[10px] text-slate-400">防御力 +5</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-xs font-bold text-slate-400 pt-2">消費アイテム (タップで使用)</div>
+                <div class="space-y-2 max-h-48 overflow-y-auto" id="inventory-list">
+                    <!-- JavaScriptで動的生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- モバイル向け Touch D-PAD (画面左下) -->
+    <div id="mobile-dpad" class="md:hidden fixed bottom-24 left-4 z-30 w-32 h-32 relative opacity-60 hover:opacity-100 transition-opacity">
+        <div class="absolute inset-0 bg-slate-900/60 rounded-full border-2 border-slate-600 backdrop-blur"></div>
+        <button id="dpad-up" class="absolute top-1 left-11 w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center active:bg-pink-500 text-white font-bold">▲</button>
+        <button id="dpad-down" class="absolute bottom-1 left-11 w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center active:bg-pink-500 text-white font-bold">▼</button>
+        <button id="dpad-left" class="absolute top-11 left-1 w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center active:bg-pink-500 text-white font-bold">◀</button>
+        <button id="dpad-right" class="absolute top-11 right-1 w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center active:bg-pink-500 text-white font-bold">▶</button>
+    </div>
+
+    <script>
+        // Lucideアイコンの初期化
+        lucide.createIcons();
+
+        // -------------------------------------------------------------
+        // GAME CONFIG & ENGINE STATE
+        // -------------------------------------------------------------
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const minimapCanvas = document.getElementById('minimap-canvas');
+        const miniCtx = minimapCanvas.getContext('2d');
+
+        // スクリーンキャンバスのリサイズ制御
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            minimapCanvas.width = 112;
+            minimapCanvas.height = 80;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // ゲームシステム統合ステート
+        const GameState = {
+            started: false,
+            paused: false,
+            currentArea: 'SCHOOL', // SCHOOL, ROAD, SHOPPING, PARK
+            questStep: 0,
+            money: 100,
+            inventory: [
+                { id: 'yakisoba_pan', name: '焼きそばパン', count: 2, icon: '🥖', hpRestore: 40, desc: 'HPを40回復する。' },
+                { id: 'pocari', name: 'スポーツドリンク', count: 1, icon: '🥤', hpRestore: 80, desc: 'HPを80回復する。' }
+            ],
+            dialogActive: false,
+            dialogQueue: [],
+            dialogCallback: null,
+            audioInitialized: false,
+            skeletalReady: false
+        };
+
+        // =====================================================================
+        // HERO SPRITE ATLAS (transparent sheet extracted from concept art)
+        // =====================================================================
+        const HERO_SPRITE_URL = './images/hero-sheet.png';
+        const HERO_DRAW_SCALE = 2;
+        const HERO_VISUAL_H = 66 * HERO_DRAW_SCALE;
+        const CHAR_TALK_RANGE = Math.round(HERO_VISUAL_H * 0.9);
+
+        const CHAR_ART_URLS = {
+            delinquent: './images/char-delinquent.svg',
+            teacher: './images/char-teacher.svg',
+            baker: './images/char-baker.svg',
+            boss: './images/char-boss.svg',
+            dog: './images/char-dog.svg',
+            cat: './images/char-cat.svg'
+        };
+        const CHAR_ART = {};
+
+        function charArtKey(kind) {
+            if (kind === 'stray_dog') return 'dog';
+            if (kind === 'bakery_owner') return 'baker';
+            return kind;
+        }
+
+        function loadCharArt() {
+            return Promise.all(Object.keys(CHAR_ART_URLS).map((key) => new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => { CHAR_ART[key] = img; resolve(); };
+                img.onerror = () => resolve();
+                img.src = CHAR_ART_URLS[key];
+            })));
+        }
+
+        function charArtHeight(kind) {
+            const img = CHAR_ART[charArtKey(kind)];
+            if (!img) return HERO_VISUAL_H;
+            return (img.naturalHeight || img.height) * HERO_DRAW_SCALE;
+        }
+
+        function drawGroundShadow(ctx, x, y, size) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            const hw = Math.max(10, (size * 0.22) | 0);
+            const hh = Math.max(4, (size * 0.08) | 0);
+            ctx.fillRect((x - hw) | 0, (y - hh + 2) | 0, hw * 2, hh * 2);
+            ctx.restore();
+        }
+
+        function drawCharArt(ctx, kind, x, y, facing = 'down') {
+            const img = CHAR_ART[charArtKey(kind)];
+            if (!img) {
+                drawGroundShadow(ctx, x, y, 48);
+                return 48;
+            }
+            const w = (img.naturalWidth || img.width) * HERO_DRAW_SCALE;
+            const h = (img.naturalHeight || img.height) * HERO_DRAW_SCALE;
+            drawGroundShadow(ctx, x, y, h);
+            ctx.save();
+            ctx.imageSmoothingEnabled = false;
+            ctx.translate(x | 0, y | 0);
+            if (facing === 'left') ctx.scale(-1, 1);
+            ctx.drawImage(img, (-w / 2) | 0, -h | 0, w | 0, h | 0);
+            ctx.restore();
+            return h;
+        }
+        const HERO_FRAMES = {"walk_up": [{"sx": 2, "sy": 4, "w": 39, "h": 65, "dx": -20, "dy": -59}, {"sx": 43, "sy": 2, "w": 38, "h": 67, "dx": -19, "dy": -61}, {"sx": 83, "sy": 3, "w": 41, "h": 66, "dx": -21, "dy": -60}, {"sx": 126, "sy": 8, "w": 38, "h": 61, "dx": -19, "dy": -55}], "walk_down": [{"sx": 2, "sy": 73, "w": 43, "h": 43, "dx": -22, "dy": -37}, {"sx": 47, "sy": 75, "w": 42, "h": 41, "dx": -21, "dy": -35}, {"sx": 91, "sy": 75, "w": 42, "h": 41, "dx": -21, "dy": -35}, {"sx": 135, "sy": 73, "w": 42, "h": 43, "dx": -21, "dy": -37}], "walk_left": [{"sx": 2, "sy": 123, "w": 36, "h": 59, "dx": -18, "dy": -53}, {"sx": 40, "sy": 122, "w": 36, "h": 60, "dx": -18, "dy": -54}, {"sx": 78, "sy": 123, "w": 36, "h": 59, "dx": -18, "dy": -53}, {"sx": 116, "sy": 120, "w": 36, "h": 62, "dx": -18, "dy": -56}], "walk_right": [{"sx": 2, "sy": 186, "w": 36, "h": 62, "dx": -18, "dy": -56}, {"sx": 40, "sy": 186, "w": 35, "h": 62, "dx": -18, "dy": -56}, {"sx": 77, "sy": 186, "w": 35, "h": 62, "dx": -18, "dy": -56}, {"sx": 114, "sy": 187, "w": 35, "h": 61, "dx": -18, "dy": -55}], "idle_down": [{"sx": 2, "sy": 252, "w": 34, "h": 66, "dx": -17, "dy": -60}], "idle_up": [{"sx": 2, "sy": 322, "w": 36, "h": 66, "dx": -18, "dy": -60}], "hurt": [{"sx": 2, "sy": 392, "w": 39, "h": 68, "dx": -20, "dy": -62}], "victory": [{"sx": 2, "sy": 464, "w": 40, "h": 65, "dx": -20, "dy": -59}], "flute_idle": [{"sx": 2, "sy": 533, "w": 37, "h": 77, "dx": -19, "dy": -71}], "flute_raise": [{"sx": 2, "sy": 614, "w": 47, "h": 77, "dx": -24, "dy": -71}], "flute_play": [{"sx": 2, "sy": 695, "w": 47, "h": 77, "dx": -24, "dy": -71}], "flute_shot": [{"sx": 2, "sy": 776, "w": 45, "h": 74, "dx": -23, "dy": -68}], "yoyo_idle": [{"sx": 2, "sy": 854, "w": 36, "h": 74, "dx": -18, "dy": -68}], "yoyo_throw": [{"sx": 2, "sy": 932, "w": 73, "h": 68, "dx": -37, "dy": -62}], "yoyo_spin_a": [{"sx": 2, "sy": 1004, "w": 63, "h": 67, "dx": -32, "dy": -61}], "yoyo_spin_b": [{"sx": 2, "sy": 1075, "w": 72, "h": 70, "dx": -36, "dy": -64}], "yoyo_spin_c": [{"sx": 2, "sy": 1149, "w": 98, "h": 72, "dx": -49, "dy": -66}], "yoyo_hit_a": [{"sx": 2, "sy": 1225, "w": 69, "h": 67, "dx": -35, "dy": -61}], "yoyo_hit_b": [{"sx": 2, "sy": 1296, "w": 85, "h": 67, "dx": -43, "dy": -61}], "yoyo_hit_c": [{"sx": 2, "sy": 1367, "w": 80, "h": 67, "dx": -40, "dy": -61}], "yoyo_hit_d": [{"sx": 2, "sy": 1438, "w": 71, "h": 67, "dx": -36, "dy": -61}], "idle": [{"sx": 2, "sy": 252, "w": 34, "h": 66, "dx": -17, "dy": -60}], "idle_left": [{"sx": 2, "sy": 123, "w": 36, "h": 59, "dx": -18, "dy": -53}], "idle_right": [{"sx": 2, "sy": 186, "w": 36, "h": 62, "dx": -18, "dy": -56}], "attack": [{"sx": 2, "sy": 932, "w": 73, "h": 68, "dx": -37, "dy": -62}, {"sx": 2, "sy": 1004, "w": 63, "h": 67, "dx": -32, "dy": -61}, {"sx": 2, "sy": 1296, "w": 85, "h": 67, "dx": -43, "dy": -61}], "dash": [{"sx": 2, "sy": 464, "w": 40, "h": 65, "dx": -20, "dy": -59}]};
+
+        class SkeletalAnimator {
+            constructor() {
+                this.spriteImage = null;
+                this.frameMap = {};
+                this.isLoaded = false;
+            }
+
+            async loadSprite(url) {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        this.spriteImage = img;
+                        this.isLoaded = true;
+                        resolve();
+                    };
+                    img.onerror = () => resolve();
+                    img.src = url;
+                });
+            }
+
+            defineFrames(actionName, frames) {
+                this.frameMap[actionName] = frames;
+            }
+
+            drawFrame(ctx, actionName, frameIndex, x, y, direction = 'down', scale = HERO_DRAW_SCALE) {
+                if (!this.isLoaded || !this.frameMap[actionName]) return;
+
+                const frames = this.frameMap[actionName];
+                const frame = frames[frameIndex % frames.length];
+                const alreadyLeft = actionName.indexOf('left') !== -1;
+
+                ctx.save();
+                ctx.imageSmoothingEnabled = false;
+                ctx.translate(x | 0, y | 0);
+
+                if (direction === 'left' && !alreadyLeft) ctx.scale(-1, 1);
+
+                ctx.drawImage(
+                    this.spriteImage,
+                    frame.sx, frame.sy, frame.w, frame.h,
+                    (frame.dx * scale) | 0, (frame.dy * scale) | 0,
+                    (frame.w * scale) | 0, (frame.h * scale) | 0
+                );
+
+                ctx.restore();
+            }
+        }
+
+        const skeletal = new SkeletalAnimator();
+
+        // -------------------------------------------------------------
+        // PROGRAM 8: TONE.JS AUDIOMANAGER (プロシージャル音源＆BGM)
+        // -------------------------------------------------------------
+        class SoundEngine {
+            constructor() {
+                this.synth = null;
+                this.bgmSynth = null;
+                this.loop = null;
+            }
+
+            init() {
+                if (GameState.audioInitialized) return;
+                try {
+                    Tone.start();
+                    this.synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                    this.synth.volume.value = -10;
+
+                    this.bgmSynth = new Tone.MembraneSynth().toDestination();
+                    this.bgmSynth.volume.value = -16;
+
+                    // 簡易レトロBGMループ
+                    const notes = ["C3", "E3", "G3", "B3", "A3", "F3", "G3", "C4"];
+                    let index = 0;
+                    Tone.Transport.scheduleRepeat((time) => {
+                        if (GameState.started && !GameState.paused) {
+                            let note = notes[index % notes.length];
+                            if (GameState.currentArea === 'PARK') note = "C2"; // ボス戦は低音
+                            this.bgmSynth.triggerAttackRelease(note, "8n", time);
+                            index++;
+                        }
+                    }, "4n");
+
+                    Tone.Transport.bpm.value = 120;
+                    Tone.Transport.start();
+                    GameState.audioInitialized = true;
+                } catch (e) {
+                    GameState.audioInitialized = true;
+                }
+            }
+
+            playAttack() {
+                if (!GameState.audioInitialized) return;
+                this.synth.triggerAttackRelease(["C4", "E4"], "16n");
+            }
+
+            playHit() {
+                if (!GameState.audioInitialized) return;
+                this.synth.triggerAttackRelease(["G2", "C3"], "16n");
+            }
+
+            playLevelUp() {
+                if (!GameState.audioInitialized) return;
+                this.synth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "8n");
+            }
+
+            playDash() {
+                if (!GameState.audioInitialized) return;
+                this.synth.triggerAttackRelease(["A4", "E5"], "32n");
+            }
+        }
+        const audio = new SoundEngine();
+
+        // -------------------------------------------------------------
+        // PROGRAM 1: MAPS & SEAMLESS AREA MANAGER (ワールドマップ定義)
+        // -------------------------------------------------------------
+        const WORLD_WIDTH = 1600;
+        const WORLD_HEIGHT = 1200;
+
+        const MAP_AREAS = {
+            SCHOOL: {
+                name: "北校舎前グラウンド",
+                bgColor: "#2d5a27",
+                bounds: { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT },
+                portals: [
+                    { x: WORLD_WIDTH / 2 - 60, y: WORLD_HEIGHT - 30, w: 120, h: 30, target: 'ROAD', spawnX: WORLD_WIDTH / 2, spawnY: 80, reqQuest: 0 }
+                ],
+                decorations: [
+                    { type: 'school_building', x: 200, y: 50, w: 1200, h: 220 },
+                    { type: 'tree', x: 100, y: 400 }, { type: 'tree', x: 1400, y: 400 },
+                    { type: 'tree', x: 150, y: 800 }, { type: 'tree', x: 1350, y: 800 },
+                    { type: 'goal_net', x: 400, y: 500, w: 120, h: 80 }
+                ],
+                npcs: [
+                    { 
+                        id: 'teacher', 
+                        name: '担任の先生', 
+                        x: 800, 
+                        y: 340, 
+                        sprite: '👨‍🏫', 
+                        dialog: function() {
+                            if (player.hp < player.maxHp) {
+                                player.hp = player.maxHp;
+                                updateHUD();
+                                vfxManager.addDamageText(player.x, player.y - 30, 'HP全回復!', '#4ade80');
+                                audio.playLevelUp();
+                                return [
+                                    "顔色があまり良くないな…よし、手当てをしてあげよう！",
+                                    "（先生に手当てを受け、HPが全回復した！）",
+                                    "公園の暗黒校長は強力だ。商店街で焼きそばパンを買って回復アイテムを準備しておくといいぞ！"
+                                ];
+                            }
+                            return [
+                                "おお、よく来たな！いま学校の外が大変なことになっているんだ！",
+                                "公園に現れた怪しい影…あれは正気を失った『暗黒校長』だ！",
+                                "校門を出て道路・商店街を抜け、公園の暗黒校長を倒して学校の平和を取り戻してくれ！",
+                                "体力が減ったらここに戻ってくれば、いつでも手当てしてやるぞ！"
+                            ];
+                        } 
+                    }
+                ]
+            },
+            ROAD: {
+                name: "夕暮れの通学道路",
+                bgColor: "#334155",
+                bounds: { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT },
+                portals: [
+                    { x: WORLD_WIDTH / 2 - 60, y: 0, w: 120, h: 30, target: 'SCHOOL', spawnX: WORLD_WIDTH / 2, spawnY: WORLD_HEIGHT - 100 },
+                    { x: WORLD_WIDTH - 30, y: WORLD_HEIGHT / 2 - 60, w: 30, h: 120, target: 'SHOPPING', spawnX: 80, spawnY: WORLD_HEIGHT / 2 }
+                ],
+                decorations: [
+                    { type: 'asphalt', x: 0, y: 400, w: WORLD_WIDTH, h: 400 },
+                    { type: 'crosswalk', x: 700, y: 400, w: 200, h: 400 },
+                    { type: 'traffic_light', x: 670, y: 350 },
+                    { type: 'fence', x: 0, y: 380, w: WORLD_WIDTH, h: 20 }
+                ],
+                npcs: [
+                    { id: 'cat', name: '街の野良猫', x: 750, y: 450, sprite: '🐈', dialog: ["ニャー（東の商店街で美味しい焼きそばパンが売ってるニャ）"] }
+                ]
+            },
+            SHOPPING: {
+                name: "昭和レトロ商店街",
+                bgColor: "#475569",
+                bounds: { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT },
+                portals: [
+                    { x: 0, y: WORLD_HEIGHT / 2 - 60, w: 30, h: 120, target: 'ROAD', spawnX: WORLD_WIDTH - 100, spawnY: WORLD_HEIGHT / 2 },
+                    { x: WORLD_WIDTH / 2 - 60, y: WORLD_HEIGHT - 30, w: 120, h: 30, target: 'PARK', spawnX: WORLD_WIDTH / 2, spawnY: 80 }
+                ],
+                decorations: [
+                    { type: 'shop', name: 'パン屋', x: 200, y: 200, w: 250, h: 180, color: '#f59e0b' },
+                    { type: 'shop', name: '駄菓子屋', x: 550, y: 200, w: 250, h: 180, color: '#ef4444' },
+                    { type: 'shop', name: 'ゲームセンター', x: 900, y: 200, w: 300, h: 180, color: '#8b5cf6' }
+                ],
+                npcs: [
+                    { id: 'bakery_owner', name: 'パン屋の店主', x: 320, y: 400, sprite: '🍞', shopItem: 'yakisoba_pan', price: 50, dialog: ["いらっしゃい！焼きそばパン(50円)で元気を回復していきな！"] }
+                ]
+            },
+            PARK: {
+                name: "決戦のさくら公園",
+                bgColor: "#1e293b",
+                bounds: { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT },
+                portals: [
+                    { x: WORLD_WIDTH / 2 - 60, y: 0, w: 120, h: 30, target: 'SHOPPING', spawnX: WORLD_WIDTH / 2, spawnY: WORLD_HEIGHT - 100 }
+                ],
+                decorations: [
+                    { type: 'fountain', x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2, r: 100 },
+                    { type: 'bench', x: 500, y: 500 }, { type: 'bench', x: 1100, y: 500 },
+                    { type: 'cherry_tree', x: 200, y: 200 }, { type: 'cherry_tree', x: 1400, y: 200 },
+                    { type: 'cherry_tree', x: 200, y: 1000 }, { type: 'cherry_tree', x: 1400, y: 1000 }
+                ],
+                npcs: []
+            }
+        };
+
+        // -------------------------------------------------------------
+        // PROGRAM 2 & 3: PLAYER ENGINE & HITBOX / COMBAT MATRIX
+        // -------------------------------------------------------------
+        class Player {
+            constructor() {
+                this.x = WORLD_WIDTH / 2;
+                this.y = WORLD_HEIGHT / 2 + 100;
+                this.radius = 22;
+                this.speed = 4.5;
+                this.vx = 0;
+                this.vy = 0;
+                this.facing = 'down'; // up, down, left, right
+
+                // ステータス
+                this.level = 1;
+                this.hp = 100;
+                this.maxHp = 100;
+                this.exp = 0;
+                this.maxExp = 50;
+                this.atk = 18;
+                this.def = 5;
+
+                // アクションステート
+                this.isAttacking = false;
+                this.comboStep = 0;
+                this.attackTimer = 0;
+                this.isDashing = false;
+                this.dashTimer = 0;
+                this.iFrames = 0; // 無敵時間
+
+                // 残像エフェクト用データ
+                this.ghosts = [];
+
+                // スケルタルアニメーション
+                this.animationState = 'idle_down';
+                this.frameIndex = 0;
+                this.frameTimer = 0;
+                this.frameSpeed = 6;
+                this.hurtTimer = 0;
+            }
+
+            update(keys) {
+                // ダッシュ処理
+                if (this.isDashing) {
+                    this.dashTimer--;
+                    this.ghosts.push({ x: this.x, y: this.y, alpha: 0.6 });
+                    if (this.dashTimer <= 0) {
+                        this.isDashing = false;
+                    }
+                    this.animationState = 'dash';
+                } else {
+                    // 移動計算
+                    let dx = 0;
+                    let dy = 0;
+                    if (keys['ArrowUp'] || keys['KeyW']) dy -= 1;
+                    if (keys['ArrowDown'] || keys['KeyS']) dy += 1;
+                    if (keys['ArrowLeft'] || keys['KeyA']) dx -= 1;
+                    if (keys['ArrowRight'] || keys['KeyD']) dx += 1;
+
+                    if (dx !== 0 && dy !== 0) {
+                        dx *= 0.7071;
+                        dy *= 0.7071;
+                    }
+
+                    if (!this.isAttacking) {
+                        this.vx = dx * this.speed;
+                        this.vy = dy * this.speed;
+                        this.x += this.vx;
+                        this.y += this.vy;
+
+                        if (dx < 0) this.facing = 'left';
+                        if (dx > 0) this.facing = 'right';
+                        if (dy < 0) this.facing = 'up';
+                        if (dy > 0) this.facing = 'down';
+
+                        if (dx !== 0 || dy !== 0) {
+                            this.animationState = `walk_${this.facing}`;
+                        } else {
+                            this.animationState = `idle_${this.facing}`;
+                        }
+                    } else {
+                        this.animationState = 'attack';
+                    }
+                }
+
+                if (this.hurtTimer > 0) {
+                    this.hurtTimer--;
+                    if (!this.isAttacking && !this.isDashing) {
+                        this.animationState = 'hurt';
+                    }
+                }
+
+                // ワールド境界チェック
+                const currentBounds = MAP_AREAS[GameState.currentArea].bounds;
+                this.x = Math.max(this.radius, Math.min(currentBounds.w - this.radius, this.x));
+                this.y = Math.max(this.radius, Math.min(currentBounds.h - this.radius, this.y));
+
+                // タイマー減少
+                if (this.attackTimer > 0) {
+                    this.attackTimer--;
+                    if (this.attackTimer <= 0) {
+                        this.isAttacking = false;
+                    }
+                }
+                if (this.iFrames > 0) this.iFrames--;
+
+                // ゴースト減衰
+                this.ghosts.forEach(g => g.alpha -= 0.08);
+                this.ghosts = this.ghosts.filter(g => g.alpha > 0);
+
+                // フレーム更新（アニメーション）
+                this.frameTimer++;
+                if (this.frameTimer >= this.frameSpeed) {
+                    this.frameTimer = 0;
+                    this.frameIndex++;
+                }
+            }
+
+            attack() {
+                if (this.isAttacking || this.isDashing) return;
+                this.isAttacking = true;
+                this.comboStep = (this.comboStep % 3) + 1;
+                this.attackTimer = 14; // アニメーションフレーム持続時間
+
+                audio.playAttack();
+
+                // 判定ヒットボックス計算 (PROGRAM 3: HITBOX CALCULATOR)
+                const hitRange = 60 + this.comboStep * 10;
+                let hx = this.x;
+                let hy = this.y;
+                if (this.facing === 'left') hx -= hitRange;
+                if (this.facing === 'right') hx += hitRange;
+                if (this.facing === 'up') hy -= hitRange;
+                if (this.facing === 'down') hy += hitRange;
+
+                // VFXエフェクト追加
+                vfxManager.addSlash(hx, hy, this.facing, this.comboStep);
+
+                // 敵へのヒット判定計算
+                enemies.forEach(enemy => {
+                    if (enemy.area === GameState.currentArea && enemy.isAlive) {
+                        const dist = Math.hypot(enemy.x - hx, enemy.y - hy);
+                        if (dist < enemy.radius + 40) {
+                            const dmg = Math.floor(this.atk * (1 + this.comboStep * 0.3) + Math.random() * 5);
+                            enemy.takeDamage(dmg, this.x, this.y);
+                        }
+                    }
+                });
+            }
+
+            dash() {
+                if (this.isDashing || this.isAttacking) return;
+                this.isDashing = true;
+                this.dashTimer = 12;
+                this.iFrames = 18;
+
+                let dashDist = 14;
+                if (this.facing === 'left') this.x -= dashDist * 8;
+                if (this.facing === 'right') this.x += dashDist * 8;
+                if (this.facing === 'up') this.y -= dashDist * 8;
+                if (this.facing === 'down') this.y += dashDist * 8;
+
+                audio.playDash();
+            }
+
+            useSkill() {
+                if (this.isAttacking) return;
+                this.isAttacking = true;
+                this.attackTimer = 25;
+
+                // 全方位スキル「文房具ミサイル＆教科書スラッシュ」
+                vfxManager.addNova(this.x, this.y);
+                audio.playLevelUp();
+
+                enemies.forEach(enemy => {
+                    if (enemy.area === GameState.currentArea && enemy.isAlive) {
+                        const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+                        if (dist < 180) {
+                            const dmg = Math.floor(this.atk * 2.2);
+                            enemy.takeDamage(dmg, this.x, this.y);
+                        }
+                    }
+                });
+            }
+
+            takeDamage(amount) {
+                if (this.iFrames > 0) return;
+                const finalDmg = Math.max(1, amount - this.def);
+                this.hp = Math.max(0, this.hp - finalDmg);
+                this.iFrames = 30;
+                this.hurtTimer = 18;
+
+                camera.shake(10);
+                vfxManager.addDamageText(this.x, this.y - 30, `-${finalDmg}`, '#ef4444');
+                audio.playHit();
+
+                if (this.hp <= 0) {
+                    showNotification("倒れてしまった！保健室(学校)へ戻された...");
+                    this.hp = this.maxHp;
+                    GameState.currentArea = 'SCHOOL';
+                    this.x = WORLD_WIDTH / 2;
+                    this.y = WORLD_HEIGHT / 2;
+                }
+            }
+
+            gainExp(amount) {
+                this.exp += amount;
+                vfxManager.addDamageText(this.x, this.y - 40, `+${amount} EXP`, '#38bdf8');
+                if (this.exp >= this.maxExp) {
+                    this.level++;
+                    this.exp -= this.maxExp;
+                    this.maxExp = Math.floor(this.maxExp * 1.5);
+                    this.maxHp += 20;
+                    this.hp = this.maxHp;
+                    this.atk += 5;
+                    this.def += 2;
+                    audio.playLevelUp();
+                    showNotification(`LEVEL UP! Lv.${this.level} に上がった！`);
+                }
+            }
+
+            draw(ctx) {
+                // ゴースト（ダッシュ残像）描画
+                this.ghosts.forEach(g => {
+                    ctx.save();
+                    ctx.globalAlpha = g.alpha;
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.beginPath();
+                    ctx.arc(g.x, g.y, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                // 無敵点滅
+                if (this.iFrames % 4 > 2) return;
+
+                ctx.save();
+                drawGroundShadow(ctx, this.x, this.y, HERO_VISUAL_H);
+
+                // スケルタルアニメーション描画
+                if (GameState.skeletalReady && skeletal.isLoaded) {
+                    skeletal.drawFrame(ctx, this.animationState, this.frameIndex, this.x, this.y, this.facing, HERO_DRAW_SCALE);
+                } else {
+                    // フォールバック：従来の円形描画
+                    ctx.translate(this.x, this.y);
+                    ctx.fillStyle = '#ec4899';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.stroke();
+                    ctx.fillStyle = '#fde047';
+                    ctx.beginPath();
+                    ctx.arc(0, -6, 12, Math.PI, 0);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+        }
+
+        // -------------------------------------------------------------
+        // PROGRAM 5: ENEMY ENGINE & FSM AI (敵＆ラスボス状態遷移機械)
+        // -------------------------------------------------------------
+        class Enemy {
+            constructor(x, y, type, area) {
+                this.x = x;
+                this.y = y;
+                this.type = type; // 'delinquent' (不良), 'stray_dog' (野良犬), 'boss' (暗黒校長)
+                this.area = area;
+                this.isAlive = true;
+
+                this.state = 'IDLE'; // IDLE, CHASE, ATTACK, COOLDOWN
+                this.stateTimer = 0;
+
+                if (type === 'delinquent') {
+                    this.name = '不良生徒';
+                    this.radius = 22;
+                    this.hp = 60;
+                    this.maxHp = 60;
+                    this.atk = 12;
+                    this.speed = 2.2;
+                    this.expYield = 25;
+                    this.moneyYield = 30;
+                    this.sprite = '😼';
+                } else if (type === 'stray_dog') {
+                    this.name = '暴走野良犬';
+                    this.radius = 18;
+                    this.hp = 40;
+                    this.maxHp = 40;
+                    this.atk = 16;
+                    this.speed = 3.2;
+                    this.expYield = 20;
+                    this.moneyYield = 15;
+                    this.sprite = '🐕';
+                } else if (type === 'boss') {
+                    this.name = '暗黒校長先生';
+                    this.radius = 45;
+                    this.hp = 600;
+                    this.maxHp = 600;
+                    this.atk = 24;
+                    this.speed = 1.8;
+                    this.expYield = 300;
+                    this.moneyYield = 500;
+                    this.sprite = '👺';
+                    this.phase = 1;
+                }
+            }
+
+            update(player) {
+                if (!this.isAlive || this.area !== GameState.currentArea) return;
+
+                const dist = Math.hypot(player.x - this.x, player.y - this.y);
+
+                // FSM AI 状態遷移処理
+                switch (this.state) {
+                    case 'IDLE':
+                        if (dist < 280) this.state = 'CHASE';
+                        break;
+                    case 'CHASE':
+                        if (dist > 380) {
+                            this.state = 'IDLE';
+                        } else if (dist < this.radius + player.radius + 10) {
+                            this.state = 'ATTACK';
+                        } else {
+                            // プレイヤー追撃移動
+                            const angle = Math.atan2(player.y - this.y, player.x - this.x);
+                            this.x += Math.cos(angle) * this.speed;
+                            this.y += Math.sin(angle) * this.speed;
+                        }
+                        break;
+                    case 'ATTACK':
+                        player.takeDamage(this.atk);
+                        this.state = 'COOLDOWN';
+                        this.stateTimer = 45; // クールダウン時間
+                        break;
+                    case 'COOLDOWN':
+                        this.stateTimer--;
+                        if (this.stateTimer <= 0) this.state = 'CHASE';
+                        break;
+                }
+
+                // ボス特殊フェーズ攻撃 (弾幕生成)
+                if (this.type === 'boss' && this.hp < this.maxHp * 0.5 && this.phase === 1) {
+                    this.phase = 2;
+                    this.speed = 2.6;
+                    showNotification("暗黒校長「朝の朝礼攻撃！全校生徒傾聴！！」");
+                }
+            }
+
+            takeDamage(amount, fromX, fromY) {
+                this.hp -= amount;
+                vfxManager.addDamageText(this.x, this.y - 20, `-${amount}`, '#facc15');
+                
+                // ノックバック計算
+                const angle = Math.atan2(this.y - fromY, this.x - fromX);
+                this.x += Math.cos(angle) * 20;
+                this.y += Math.sin(angle) * 20;
+
+                if (this.hp <= 0) {
+                    this.isAlive = false;
+                    vfxManager.addExplosion(this.x, this.y);
+                    player.gainExp(this.expYield);
+                    GameState.money += this.moneyYield;
+                    updateHUD();
+
+                    if (this.type === 'boss') {
+                        showDialog('暗黒校長', ['グハッ…正気に戻ったぞ…！', '見事だ若きヒーローよ！放課後の平和は守られた！'], () => {
+                            showNotification("🎉 ゲームクリア！おめでとうございます！");
+                        });
+                    }
+                }
+            }
+
+            draw(ctx) {
+                if (!this.isAlive || this.area !== GameState.currentArea) return;
+
+                const facing = (player && player.x < this.x) ? 'left' : 'right';
+                const h = drawCharArt(ctx, this.type, this.x, this.y, facing);
+
+                ctx.save();
+                const barWidth = Math.max(40, (h * 0.55) | 0);
+                const barY = (this.y - h - 8) | 0;
+                ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                ctx.fillRect((this.x - barWidth / 2) | 0, barY, barWidth, 6);
+                ctx.fillStyle = '#ef4444';
+                ctx.fillRect((this.x - barWidth / 2) | 0, barY, (barWidth * (this.hp / this.maxHp)) | 0, 6);
+                ctx.restore();
+            }
+        }
+
+        // -------------------------------------------------------------
+        // PROGRAM 4 & 9: VFX ENGINE & FLOATING COMBAT TEXT
+        // -------------------------------------------------------------
+        class VFXManager {
+            constructor() {
+                this.slashes = [];
+                this.particles = [];
+                this.damageTexts = [];
+            }
+
+            addSlash(x, y, facing, step) {
+                this.slashes.push({ x, y, facing, step, life: 10, maxLife: 10 });
+            }
+
+            addNova(x, y) {
+                for (let i = 0; i < 24; i++) {
+                    const angle = (Math.PI * 2 / 24) * i;
+                    this.particles.push({
+                        x, y,
+                        vx: Math.cos(angle) * 8,
+                        vy: Math.sin(angle) * 8,
+                        color: '#a855f7',
+                        size: 6,
+                        life: 20
+                    });
+                }
+            }
+
+            addExplosion(x, y) {
+                for (let i = 0; i < 16; i++) {
+                    this.particles.push({
+                        x, y,
+                        vx: (Math.random() - 0.5) * 10,
+                        vy: (Math.random() - 0.5) * 10,
+                        color: '#f97316',
+                        size: 8,
+                        life: 25
+                    });
+                }
+            }
+
+            addDamageText(x, y, text, color) {
+                this.damageTexts.push({ x, y, text, color, alpha: 1, vy: -1.5 });
+            }
+
+            update() {
+                this.slashes.forEach(s => s.life--);
+                this.slashes = this.slashes.filter(s => s.life > 0);
+
+                this.particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life--;
+                });
+                this.particles = this.particles.filter(p => p.life > 0);
+
+                this.damageTexts.forEach(dt => {
+                    dt.y += dt.vy;
+                    dt.alpha -= 0.03;
+                });
+                this.damageTexts = this.damageTexts.filter(dt => dt.alpha > 0);
+            }
+
+            draw(ctx) {
+                // 斬撃描画
+                this.slashes.forEach(s => {
+                    ctx.save();
+                    ctx.strokeStyle = '#f472b6';
+                    ctx.lineWidth = 6;
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, 35, 0, Math.PI * 1.5);
+                    ctx.stroke();
+                    ctx.restore();
+                });
+
+                // パーティクル描画
+                this.particles.forEach(p => {
+                    ctx.save();
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                // ダメージテキスト描画
+                this.damageTexts.forEach(dt => {
+                    ctx.save();
+                    ctx.globalAlpha = dt.alpha;
+                    ctx.fillStyle = dt.color;
+                    ctx.font = '900 18px DotGothic16, sans-serif';
+                    ctx.fillText(dt.text, dt.x, dt.y);
+                    ctx.restore();
+                });
+            }
+        }
+
+        // -------------------------------------------------------------
+        // PROGRAM 8: DYNAMIC CAMERA & SMOOTH VIEWPORT MANAGER
+        // -------------------------------------------------------------
+        class DynamicCamera {
+            constructor() {
+                this.x = 0;
+                this.y = 0;
+                this.shakeAmount = 0;
+            }
+
+            follow(target) {
+                const targetX = target.x - canvas.width / 2;
+                const targetY = target.y - canvas.height / 2;
+
+                // スムース追従 (lerp)
+                this.x += (targetX - this.x) * 0.1;
+                this.y += (targetY - this.y) * 0.1;
+
+                if (this.shakeAmount > 0) {
+                    this.x += (Math.random() - 0.5) * this.shakeAmount;
+                    this.y += (Math.random() - 0.5) * this.shakeAmount;
+                    this.shakeAmount *= 0.88;
+                }
+            }
+
+            shake(amount) {
+                this.shakeAmount = amount;
+            }
+        }
+
+        // インスタンス化
+        const player = new Player();
+        const camera = new DynamicCamera();
+        const vfxManager = new VFXManager();
+
+        // 敵のスポーン設定
+        const enemies = [
+            new Enemy(600, 700, 'delinquent', 'SCHOOL'),
+            new Enemy(1000, 800, 'delinquent', 'SCHOOL'),
+            new Enemy(400, 500, 'stray_dog', 'ROAD'),
+            new Enemy(1200, 500, 'stray_dog', 'ROAD'),
+            new Enemy(800, 600, 'delinquent', 'SHOPPING'),
+            new Enemy(800, 600, 'boss', 'PARK')
+        ];
+
+        // -------------------------------------------------------------
+        // PROGRAM 6: QUEST & INTERACTION SYSTEM
+        // -------------------------------------------------------------
+        function checkPortalsAndInteractions() {
+            const currentMap = MAP_AREAS[GameState.currentArea];
+
+            // ポータル接触チェック
+            currentMap.portals.forEach(portal => {
+                if (player.x > portal.x && player.x < portal.x + portal.w &&
+                    player.y > portal.y && player.y < portal.y + portal.h) {
+                    
+                    GameState.currentArea = portal.target;
+                    player.x = portal.spawnX;
+                    player.y = portal.spawnY;
+                    showNotification(`${MAP_AREAS[portal.target].name} に移動しました`);
+                    updateHUD();
+                }
+            });
+
+            // NPC近接チェック (会話トリガー)
+            currentMap.npcs.forEach(npc => {
+                const dist = Math.hypot(player.x - npc.x, player.y - npc.y);
+                if (dist < CHAR_TALK_RANGE && (keys['KeyE'] || keys['InteractTrigger'])) {
+                    keys['KeyE'] = false;
+                    keys['InteractTrigger'] = false;
+                    if (npc.shopItem) {
+                        // パン屋購入処理
+                        if (GameState.money >= npc.price) {
+                            GameState.money -= npc.price;
+                            const item = GameState.inventory.find(i => i.id === npc.shopItem);
+                            if (item) item.count++;
+                            else GameState.inventory.push({ id: 'yakisoba_pan', name: '焼きそばパン', count: 1, icon: '🥖', hpRestore: 40, desc: 'HPを40回復。' });
+                            showNotification("焼きそばパンを購入しました！");
+                            updateHUD();
+                        } else {
+                            showNotification("お金が足りないよ！");
+                        }
+                    } else {
+                        const dialogTexts = typeof npc.dialog === 'function' ? npc.dialog() : npc.dialog;
+                        showDialog(npc.name, dialogTexts);
+                    }
+                }
+            });
+        }
+
+        function showDialog(speakerName, texts, onFinish = null) {
+            GameState.dialogActive = true;
+            GameState.dialogQueue = [...texts];
+            GameState.dialogCallback = onFinish;
+
+            document.getElementById('dialog-speaker-name').innerText = speakerName;
+            document.getElementById('dialog-text').innerText = GameState.dialogQueue.shift();
+            document.getElementById('dialog-box').classList.remove('hidden');
+        }
+
+        function advanceDialog() {
+            if (GameState.dialogQueue.length > 0) {
+                document.getElementById('dialog-text').innerText = GameState.dialogQueue.shift();
+            } else {
+                GameState.dialogActive = false;
+                document.getElementById('dialog-box').classList.add('hidden');
+                if (GameState.dialogCallback) GameState.dialogCallback();
+            }
+        }
+
+        document.getElementById('dialog-next-btn').addEventListener('click', advanceDialog);
+
+        // -------------------------------------------------------------
+        // PROGRAM 7 & 10: HUD, INVENTORY & NOTIFICATION SYSTEM
+        // -------------------------------------------------------------
+        function updateHUD() {
+            document.getElementById('hp-text').innerText = `${player.hp} / ${player.maxHp}`;
+            document.getElementById('hp-bar').style.width = `${(player.hp / player.maxHp) * 100}%`;
+
+            document.getElementById('exp-text').innerText = `${player.exp} / ${player.maxExp}`;
+            document.getElementById('exp-bar').style.width = `${(player.exp / player.maxExp) * 100}%`;
+
+            document.getElementById('player-level').innerText = `Lv.${player.level}`;
+            document.getElementById('money-text').innerText = GameState.money;
+            document.getElementById('location-name').innerText = MAP_AREAS[GameState.currentArea].name;
+
+            // クエストトラッカー更新
+            const questTexts = [
+                "学校のグラウンドで練習し、南の校門から道路へ出よう。",
+                "道路を東に進み、商店街へ向かおう。",
+                "商店街で準備を整え、南の公園へ向かおう！",
+                "公園で暗黒校長を倒し、平和を取り戻そう！"
+            ];
+            const areaIndex = ['SCHOOL', 'ROAD', 'SHOPPING', 'PARK'].indexOf(GameState.currentArea);
+            document.getElementById('quest-tracker-text').innerText = questTexts[areaIndex] || "";
+
+            // ミニマップ描画
+            renderMinimap();
+        }
+
+        function renderMinimap() {
+            miniCtx.fillStyle = '#0f172a';
+            miniCtx.fillRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+
+            const scaleX = minimapCanvas.width / WORLD_WIDTH;
+            const scaleY = minimapCanvas.height / WORLD_HEIGHT;
+
+            // プレイヤー位置ドット
+            miniCtx.fillStyle = '#ec4899';
+            miniCtx.beginPath();
+            miniCtx.arc(player.x * scaleX, player.y * scaleY, 3, 0, Math.PI * 2);
+            miniCtx.fill();
+        }
+
+        function showNotification(text) {
+            const toast = document.getElementById('notification-toast');
+            document.getElementById('toast-text').innerText = text;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => toast.classList.add('opacity-0'), 2500);
+        }
+
+        // インベントリモーダル制御
+        document.getElementById('btn-inventory').addEventListener('click', () => {
+            const listContainer = document.getElementById('inventory-list');
+            listContainer.innerHTML = '';
+
+            GameState.inventory.forEach(item => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'bg-slate-900 p-3 rounded-2xl border border-slate-700 flex justify-between items-center';
+                itemEl.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">${item.icon}</span>
+                        <div>
+                            <div class="text-xs font-bold text-slate-200">${item.name} x${item.count}</div>
+                            <div class="text-[10px] text-slate-400">${item.desc}</div>
+                        </div>
+                    </div>
+                    <button class="use-btn bg-pink-500 hover:bg-pink-400 text-white font-bold text-xs px-3 py-1.5 rounded-xl">使用</button>
+                `;
+                itemEl.querySelector('.use-btn').addEventListener('click', () => {
+                    if (item.count > 0) {
+                        item.count--;
+                        player.hp = Math.min(player.maxHp, player.hp + item.hpRestore);
+                        vfxManager.addDamageText(player.x, player.y - 30, `+${item.hpRestore} HP`, '#4ade80');
+                        showNotification(`${item.name} を使ってHPを回復した！`);
+                        updateHUD();
+                        document.getElementById('inventory-modal').classList.add('hidden');
+                    }
+                });
+                listContainer.appendChild(itemEl);
+            });
+
+            document.getElementById('inventory-modal').classList.remove('hidden');
+        });
+
+        document.getElementById('close-inventory-btn').addEventListener('click', () => {
+            document.getElementById('inventory-modal').classList.add('hidden');
+        });
+
+        // -------------------------------------------------------------
+        // MAIN RENDER LOOP & INPUT HANDLING
+        // -------------------------------------------------------------
+        const keys = {};
+
+        window.addEventListener('keydown', e => {
+            keys[e.code] = true;
+
+            if (e.code === 'KeyE') {
+                keys['InteractTrigger'] = true;
+                checkPortalsAndInteractions();
+            }
+            if (e.code === 'KeyJ' || e.code === 'Space') player.attack();
+            if (e.code === 'KeyK' || e.code === 'ShiftLeft') player.dash();
+            if (e.code === 'KeyL') player.useSkill();
+        });
+
+        window.addEventListener('keyup', e => {
+            keys[e.code] = false;
+        });
+
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) e.preventDefault();
+            lastTouchEnd = now;
+        }, { passive: false });
+        document.addEventListener('dblclick', (e) => e.preventDefault());
+        document.addEventListener('contextmenu', (e) => e.preventDefault());
+        document.addEventListener('touchmove', (e) => {
+            if (e.target.closest('[data-scrollable]')) return;
+            e.preventDefault();
+        }, { passive: false });
+
+        function bindTap(el, handler) {
+            if (!el) return;
+            const fire = (e) => {
+                e.preventDefault();
+                el.classList.add('is-pressed');
+                if (navigator.vibrate) navigator.vibrate(15);
+                handler(e);
+            };
+            const release = () => el.classList.remove('is-pressed');
+            el.addEventListener('pointerdown', fire);
+            el.addEventListener('pointerup', release);
+            el.addEventListener('pointercancel', release);
+            el.addEventListener('pointerleave', release);
+        }
+
+        bindTap(document.getElementById('btn-interact'), () => {
+            keys['InteractTrigger'] = true;
+            checkPortalsAndInteractions();
+        });
+        bindTap(document.getElementById('btn-attack'), () => player.attack());
+        bindTap(document.getElementById('btn-dash'), () => player.dash());
+        bindTap(document.getElementById('btn-skill'), () => player.useSkill());
+
+        const bindDpad = (id, key) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            const down = (e) => {
+                e.preventDefault();
+                btn.setPointerCapture(e.pointerId);
+                btn.classList.add('is-pressed');
+                keys[key] = true;
+                if (navigator.vibrate) navigator.vibrate(12);
+            };
+            const up = () => {
+                btn.classList.remove('is-pressed');
+                keys[key] = false;
+            };
+            btn.addEventListener('pointerdown', down);
+            btn.addEventListener('pointerup', up);
+            btn.addEventListener('pointercancel', up);
+        };
+        bindDpad('dpad-up', 'ArrowUp');
+        bindDpad('dpad-down', 'ArrowDown');
+        bindDpad('dpad-left', 'ArrowLeft');
+        bindDpad('dpad-right', 'ArrowRight');
+
+        function renderMapDecorations(ctx, areaKey) {
+            const area = MAP_AREAS[areaKey];
+            ctx.fillStyle = area.bgColor;
+            ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+
+            area.decorations.forEach(dec => {
+                ctx.save();
+                if (dec.type === 'school_building') {
+                    ctx.fillStyle = '#64748b';
+                    ctx.fillRect(dec.x, dec.y, dec.w, dec.h);
+                    ctx.fillStyle = '#38bdf8';
+                    for (let x = dec.x + 30; x < dec.x + dec.w - 30; x += 60) {
+                        ctx.fillRect(x, dec.y + 40, 30, 40);
+                        ctx.fillRect(x, dec.y + 120, 30, 40);
+                    }
+                } else if (dec.type === 'tree' || dec.type === 'cherry_tree') {
+                    ctx.fillStyle = dec.type === 'cherry_tree' ? '#f472b6' : '#15803d';
+                    ctx.beginPath();
+                    ctx.arc(dec.x, dec.y, 40, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (dec.type === 'asphalt') {
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(dec.x, dec.y, dec.w, dec.h);
+                } else if (dec.type === 'crosswalk') {
+                    ctx.fillStyle = '#ffffff';
+                    for (let x = dec.x; x < dec.x + dec.w; x += 40) {
+                        ctx.fillRect(x, dec.y + 20, 20, dec.h - 40);
+                    }
+                } else if (dec.type === 'fountain') {
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.beginPath();
+                    ctx.arc(dec.x, dec.y, dec.r, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 6;
+                    ctx.stroke();
+                } else if (dec.type === 'shop') {
+                    ctx.fillStyle = dec.color;
+                    ctx.fillRect(dec.x, dec.y, dec.w, dec.h);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 16px M PLUS Rounded 1c';
+                    ctx.fillText(dec.name, dec.x + 20, dec.y + 40);
+                }
+                ctx.restore();
+            });
+
+            // NPC描画
+            area.npcs.forEach(npc => {
+                ctx.save();
+                const h = drawCharArt(ctx, npc.id, npc.x, npc.y, 'down');
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(npc.name, npc.x, npc.y - h - 6);
+
+                if (areaKey === GameState.currentArea) {
+                    const dist = Math.hypot(player.x - npc.x, player.y - npc.y);
+                    if (dist < CHAR_TALK_RANGE) {
+                        ctx.fillStyle = '#10b981';
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = 2;
+                        const bx = npc.x - 40, by = npc.y - h - 36, bw = 80, bh = 24;
+                        ctx.beginPath();
+                        ctx.roundRect(bx, by, bw, bh, 8);
+                        ctx.fill();
+                        ctx.stroke();
+
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = 'bold 11px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('💬 [E] 話す', npc.x, npc.y - h - 24);
+                    }
+                }
+                ctx.restore();
+            });
+        }
+
+        // メインループ
+        function gameLoop() {
+            if (GameState.started && !GameState.paused) {
+                // 更新
+                if (!GameState.dialogActive) {
+                    player.update(keys);
+                    enemies.forEach(e => e.update(player));
+                    checkPortalsAndInteractions();
+                }
+                vfxManager.update();
+                camera.follow(player);
+                updateHUD();
+
+                // 描画クリア
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                ctx.save();
+                ctx.imageSmoothingEnabled = false;
+                ctx.translate(-Math.floor(camera.x), -Math.floor(camera.y));
+
+                // 1. マップ & 背景物描画
+                renderMapDecorations(ctx, GameState.currentArea);
+
+                // 2. 敵キャラクター描画
+                enemies.forEach(e => e.draw(ctx));
+
+                // 3. プレイヤー描画
+                player.draw(ctx);
+
+                // 4. VFX・エフェクト・ダメージ数値描画
+                vfxManager.draw(ctx);
+
+                ctx.restore();
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // スタートボタン処理
+        bindTap(document.getElementById('start-btn'), () => {
+            audio.init();
+            GameState.started = true;
+            document.getElementById('start-overlay').classList.add('hidden');
+            showNotification("冒険が始まった！[J]キーで攻撃しよう。");
+        });
+
+        // 特徴モーダル表示
+        document.getElementById('show-features-btn').addEventListener('click', () => {
+            document.getElementById('features-modal').classList.remove('hidden');
+        });
+        document.getElementById('close-features-btn').addEventListener('click', () => {
+            document.getElementById('features-modal').classList.add('hidden');
+        });
+
+        async function initSkeletalAnimator() {
+            await Promise.all([
+                skeletal.loadSprite(HERO_SPRITE_URL),
+                loadCharArt()
+            ]);
+            Object.keys(HERO_FRAMES).forEach((name) => {
+                skeletal.defineFrames(name, HERO_FRAMES[name]);
+            });
+            GameState.skeletalReady = skeletal.isLoaded;
+        }
+
+        // ゲーム起動ループ開始
+        window.onload = () => {
+            initSkeletalAnimator();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>

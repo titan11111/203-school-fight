@@ -1,0 +1,2607 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>スクールクエスト - 桜舞う街の放課後ARPG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=DotGothic16&family=M+PLUS+Rounded+1c:wght@400;700;900&display=swap');
+        
+        *, *::before, *::after {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            user-select: none;
+            touch-action: none;
+        }
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            height: -webkit-fill-available;
+            overflow: hidden;
+            overscroll-behavior: none;
+            background: #000;
+        }
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #000;
+        }
+        #screen {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            height: -webkit-fill-available;
+            display: flex;
+            flex-direction: column;
+            background: #000;
+        }
+        #game-stage {
+            position: relative;
+            flex: 0 0 75%;
+            height: 75%;
+            min-height: 0;
+            overflow: hidden;
+            background: #000;
+        }
+        #game-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        #virtual-controls {
+            flex: 0 0 25%;
+            height: 25%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 6px 10px;
+            padding-bottom: max(6px, env(safe-area-inset-bottom));
+            padding-left: max(10px, env(safe-area-inset-left));
+            padding-right: max(10px, env(safe-area-inset-right));
+            background: #0b1220;
+            border-top: 2px solid rgba(244, 114, 182, 0.35);
+            z-index: 30;
+        }
+        .dpad {
+            --pad: min(42vw, calc(25vh - 12px), 168px);
+            position: relative;
+            width: var(--pad);
+            height: var(--pad);
+            flex-shrink: 0;
+        }
+        .dpad-base {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.85);
+            border: 2px solid #475569;
+            border-radius: 50%;
+        }
+        .dpad button {
+            position: absolute;
+            width: calc(var(--pad) * 0.36);
+            height: calc(var(--pad) * 0.36);
+            min-width: 48px;
+            min-height: 48px;
+            background: #1e293b;
+            color: #fff;
+            border: 2px solid #64748b;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 900;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
+            transition: transform 0.08s ease, opacity 0.08s ease;
+        }
+        .dpad button:active,
+        .dpad button.is-pressed {
+            transform: scale(0.92);
+            background: #ec4899;
+            border-color: #f9a8d4;
+        }
+        #dpad-up { top: 2%; left: 50%; transform: translateX(-50%); }
+        #dpad-down { bottom: 2%; left: 50%; transform: translateX(-50%); }
+        #dpad-left { left: 2%; top: 50%; transform: translateY(-50%); }
+        #dpad-right { right: 2%; top: 50%; transform: translateY(-50%); }
+        #dpad-up:active, #dpad-up.is-pressed { transform: translateX(-50%) scale(0.92); }
+        #dpad-down:active, #dpad-down.is-pressed { transform: translateX(-50%) scale(0.92); }
+        #dpad-left:active, #dpad-left.is-pressed { transform: translateY(-50%) scale(0.92); }
+        #dpad-right:active, #dpad-right.is-pressed { transform: translateY(-50%) scale(0.92); }
+        .ctrl-quest {
+            flex: 1;
+            min-width: 0;
+            max-width: 28%;
+            padding: 6px 8px;
+            border-radius: 12px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(168, 85, 247, 0.35);
+        }
+        .action-btns {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(56px, 1fr));
+            gap: 6px;
+            max-width: 52%;
+        }
+        .btn-action {
+            min-width: 56px;
+            min-height: 56px;
+            padding: 4px 6px;
+            transition: transform 0.08s ease, opacity 0.08s ease, filter 0.08s ease, box-shadow 0.08s ease;
+            will-change: transform;
+            touch-action: manipulation;
+            box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
+        }
+        .btn-action:active, .btn-action.is-pressed {
+            transform: scale(0.92);
+            opacity: 0.88;
+        }
+        .overlay-full {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+        }
+        @media (orientation: landscape) {
+            .ctrl-quest { display: none; }
+            .dpad { --pad: min(22vw, calc(25vh - 8px), 120px); }
+            .dpad button { min-width: 40px; min-height: 40px; }
+            .action-btns { gap: 4px; max-width: 60%; }
+            .btn-action { min-width: 48px; min-height: 48px; }
+        }
+        
+        .pixel-font {
+            font-family: 'DotGothic16', sans-serif;
+        }
+
+        /* カスタムスクロールバー */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.6);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(236, 72, 153, 0.5);
+            border-radius: 3px;
+        }
+
+        /* レトロなテキストシャドウ */
+        .text-glow {
+            text-shadow: 0 0 8px rgba(244, 114, 182, 0.6), 0 2px 4px rgba(0,0,0,0.8);
+        }
+
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body class="text-white select-none">
+<div id="screen">
+        <div id="start-overlay" class="overlay-full bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-5 text-center">
+            <div class="max-w-md w-full space-y-4">
+                <button id="start-btn" type="button" class="btn-action w-full py-4 px-8 bg-gradient-to-r from-pink-500 to-purple-600 text-white font-black text-xl rounded-2xl shadow-lg border border-pink-300/40">
+                    ゲームスタート
+                </button>
+                <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-purple-300 to-indigo-400 text-glow">
+                    スクールクエスト<br><span class="text-xl font-bold text-white">〜放課後の決戦〜</span>
+                </h1>
+                <p class="text-slate-300 text-sm leading-relaxed">
+                    校門を抜け、商店街を走り、公園の<span class="text-red-400 font-bold">暗黒校長</span>を倒せ。
+                </p>
+                <button id="show-features-btn" type="button" class="text-xs text-cyan-400 underline font-semibold">
+                    搭載システムを見る
+                </button>
+                <div class="text-[11px] text-slate-400 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800 text-left">
+                    下の十字キーで移動。攻撃・回避・必殺は右のボタン。
+                </div>
+            </div>
+        </div>
+<div id="game-stage">
+
+    <!-- トップ HUD バー -->
+    <div id="hud-top" class="absolute z-20 flex justify-between items-start pointer-events-none" style="top: max(8px, env(safe-area-inset-top)); left: 8px; right: 8px;">
+        <!-- プレイヤー ステータス -->
+        <div class="glass-panel p-2 rounded-2xl flex items-center gap-3 border border-pink-500/30 pointer-events-auto min-w-0 max-w-[58%]">
+            <div class="relative">
+                <div id="player-avatar" class="w-12 h-12 rounded-xl bg-gradient-to-tr from-pink-500 to-indigo-500 flex items-center justify-center font-bold text-xl border-2 border-white/40 shadow-lg">
+                    生
+                </div>
+                <div id="player-level" class="absolute -bottom-2 -right-2 bg-yellow-400 text-slate-900 font-extrabold text-xs px-2 py-0.5 rounded-full border border-black shadow">
+                    Lv.1
+                </div>
+            </div>
+            
+            <div class="flex-1 space-y-1">
+                <div class="flex justify-between text-xs font-bold px-0.5">
+                    <span class="text-pink-300">HP</span>
+                    <span id="hp-text" class="text-slate-200">100 / 100</span>
+                </div>
+                <div class="w-full bg-slate-800 h-3 rounded-full overflow-hidden border border-slate-700/50 p-0.5">
+                    <div id="hp-bar" class="bg-gradient-to-r from-red-500 to-pink-500 h-full rounded-full transition-all duration-200" style="width: 100%"></div>
+                </div>
+
+                <div class="flex justify-between text-xs font-bold px-0.5 pt-0.5">
+                    <span class="text-cyan-300">EXP</span>
+                    <span id="exp-text" class="text-slate-200">0 / 50</span>
+                </div>
+                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700/50 p-0.5">
+                    <div id="exp-bar" class="bg-gradient-to-r from-cyan-400 to-blue-500 h-full rounded-full transition-all duration-200" style="width: 0%"></div>
+                </div>
+
+                <div class="flex justify-between text-xs font-bold px-0.5 pt-0.5">
+                    <span class="text-violet-300">SP</span>
+                    <span id="sp-text" class="text-slate-200">40 / 100</span>
+                </div>
+                <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden border border-slate-700/50 p-0.5">
+                    <div id="sp-bar" class="bg-gradient-to-r from-violet-400 to-fuchsia-500 h-full rounded-full transition-all duration-150" style="width: 40%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ミニマップ & 現在地 -->
+        <div class="glass-panel p-2.5 rounded-2xl border border-indigo-500/30 pointer-events-auto flex flex-col items-end gap-1">
+            <div class="flex items-center gap-2 text-xs font-bold text-amber-300">
+                <i data-lucide="map-pin" class="w-4 h-4 text-pink-400"></i>
+                <span id="location-name">北校舎前グラウンド</span>
+            </div>
+            <div class="relative w-28 h-20 bg-slate-900/90 rounded-xl overflow-hidden border border-slate-700">
+                <canvas id="minimap-canvas" class="w-full h-full"></canvas>
+            </div>
+            <div class="flex items-center gap-3 text-[11px] font-semibold text-slate-300 mt-0.5">
+                <span class="text-yellow-400 flex items-center gap-1"><i data-lucide="coins" class="w-3.5 h-3.5"></i><span id="money-text">0</span> 円</span>
+                <span id="weapon-text" class="text-pink-300">ヨーヨー</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="combo-hud" class="absolute top-28 right-4 z-20 pointer-events-none text-right opacity-0 transition-opacity">
+        <div id="combo-count" class="pixel-font text-4xl font-black text-white text-glow leading-none">0 HIT</div>
+        <div id="combo-rank" class="pixel-font text-2xl font-black text-yellow-300 leading-none mt-1">RANK D</div>
+        <div id="combo-callout" class="text-xs font-black text-cyan-300 mt-1 h-4"></div>
+    </div>
+
+        <canvas id="game-canvas"></canvas>
+
+        <!-- 10のシステム解説モーダル -->
+        <div id="features-modal" class="hidden overlay-full bg-slate-950/90 backdrop-blur-lg p-6 flex flex-col justify-center items-center">
+            <div class="max-w-2xl w-full glass-panel p-6 rounded-3xl max-h-[85vh] flex flex-col border border-cyan-500/30">
+                <div class="flex justify-between items-center pb-4 border-b border-slate-700">
+                    <h2 class="text-xl font-black text-cyan-300 flex items-center gap-2">
+                        <i data-lucide="cpu" class="w-6 h-6"></i> 10のARPGプログラム構成要素
+                    </h2>
+                    <button id="close-features-btn" class="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto my-4 space-y-3 text-xs text-slate-300 pr-2" data-scrollable>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">1. シームレス・エリアカメラ遷移マネージャー</span>
+                        <p class="mt-1 text-slate-400">学校・道路・商店街・公園の4マップ間の動的補間移動とバウンダリ衝突の滑らかなダイナミックカメラ追従制御。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">2. 3段攻撃＆ダッシュ・ステートエンジン</span>
+                        <p class="mt-1 text-slate-400">コンボフレームキャンセル、ダッシュ中の無敵属性、硬直時間を最適化したステートマシン処理。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">3. アクティブ・ヒットボックス＆iFrameマトリックス</span>
+                        <p class="mt-1 text-slate-400">幾何学的扇状/矩形攻撃判定と、被弾後の無敵時間(iFrames)・ベクトルノックバックリアルタイム物理計算。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">4. 動的VFX＆残像エミッター</span>
+                        <p class="mt-1 text-slate-400">ダッシュ残像、斬撃スラッシュエフェクト、ヒットスパーク、レベルアップ時パーティクル群のリアルタイム演算。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">5. 敵FSM AI＆ボス多段形態制御</span>
+                        <p class="mt-1 text-slate-400">敵の視界(FOV)索敵、追撃、攻撃クールダウンおよびラスボスのHP連動第2形態弾幕パターン移行処理。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">6. インタラクティブ・クエスト＆フラグシステム</span>
+                        <p class="mt-1 text-slate-400">校門の鍵解錠、商店街のパワーアップ購入、公園のボス打倒など目標の動的トリガー検出。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">7. インベントリ＆装備・能力計算ステータス</span>
+                        <p class="mt-1 text-slate-400">武器（竹刀/物差し）交換による攻撃範囲・威力の動的反映と回復アイテム（焼きそばパン）のストック制御。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">8. Tone.js プロシージャル・オーディオエンジン</span>
+                        <p class="mt-1 text-slate-400">アセット読み込み不要でSynth音源からマップごとの背景音楽（BGM）および打撃・スキル効果音(SE)を動的生成。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">9. フローティング Combat テキスト＆UIポータル</span>
+                        <p class="mt-1 text-slate-400">ダメージ数値、回復量、CRITICALヒットの空中浮遊フェード描画エンジン。</p>
+                    </div>
+                    <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+                        <span class="font-bold text-pink-400">10. オートセーブ＆モバイルVirtual Pad制御</span>
+                        <p class="mt-1 text-slate-400">localStorageへのゲーム進行度の自動書き込みおよびタッチデバイス用バーチャル操作インターフェース統合。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 会話・ダイアログボックス -->
+        <div id="dialog-box" class="hidden absolute bottom-3 left-3 right-3 glass-panel p-3 rounded-2xl border-2 border-pink-500/50 z-30 shadow-2xl flex gap-3 items-center">
+            <div id="dialog-speaker-img" class="w-14 h-14 rounded-xl bg-indigo-600 border-2 border-white/60 flex items-center justify-center font-extrabold text-2xl shrink-0">
+                👤
+            </div>
+            <div class="flex-1 space-y-1">
+                <div id="dialog-speaker-name" class="font-bold text-pink-300 text-sm">担任の先生</div>
+                <div id="dialog-text" class="text-xs md:text-sm text-slate-100 leading-relaxed font-medium">
+                    学校の外は危険だぞ！公園の校長先生の様子がおかしくなってしまったんだ…！
+                </div>
+            </div>
+            <button id="dialog-next-btn" class="bg-pink-500 hover:bg-pink-400 text-white font-bold text-xs px-3 py-2 rounded-xl self-end shrink-0">
+                次へ ▶
+            </button>
+        </div>
+
+        <!-- 通知メッセージポップアップ -->
+        <div id="notification-toast" class="absolute top-20 left-1/2 transform -translate-x-1/2 bg-amber-400/90 text-slate-950 font-black px-4 py-2 rounded-full border border-white shadow-xl text-xs z-30 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-2">
+            <i data-lucide="bell" class="w-4 h-4"></i> <span id="toast-text">通知テスト</span>
+        </div>
+
+    <!-- インベントリ モーダル -->
+    <div id="inventory-modal" class="hidden overlay-full bg-slate-950/80 backdrop-blur-md p-6 flex flex-col items-center justify-center">
+        <div class="glass-panel p-6 rounded-3xl max-w-md w-full border border-pink-500/30 space-y-4">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-700">
+                <h3 class="text-lg font-bold text-pink-300 flex items-center gap-2">
+                    <i data-lucide="backpack" class="w-5 h-5"></i> 所持品＆装備
+                </h3>
+                <button id="close-inventory-btn" class="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-3">
+                <div class="text-xs font-bold text-slate-400">現在のアタッチ装備</div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div id="equip-weapon" class="bg-slate-900/90 p-3 rounded-2xl border border-slate-700 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-xl">
+                            🎋
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-amber-300">竹刀</div>
+                            <div class="text-[10px] text-slate-400">攻撃力 +15</div>
+                        </div>
+                    </div>
+                    <div id="equip-armor" class="bg-slate-900/90 p-3 rounded-2xl border border-slate-700 flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-xl">
+                            👔
+                        </div>
+                        <div>
+                            <div class="text-xs font-bold text-blue-300">学ラン</div>
+                            <div class="text-[10px] text-slate-400">防御力 +5</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-xs font-bold text-slate-400 pt-2">消費アイテム (タップで使用)</div>
+                <div class="space-y-2 max-h-48 overflow-y-auto" id="inventory-list" data-scrollable>
+                    <!-- JavaScriptで動的生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <div id="virtual-controls">
+        <div class="dpad" id="mobile-dpad">
+            <div class="dpad-base"></div>
+            <button type="button" id="dpad-up" aria-label="上">▲</button>
+            <button type="button" id="dpad-left" aria-label="左">◀</button>
+            <button type="button" id="dpad-right" aria-label="右">▶</button>
+            <button type="button" id="dpad-down" aria-label="下">▼</button>
+        </div>
+        <div class="ctrl-quest">
+            <div class="text-[10px] font-extrabold text-pink-400">目的</div>
+            <div id="quest-tracker-text" class="text-[10px] font-semibold text-slate-200 leading-snug mt-0.5">
+                学校のグラウンドで練習し、南の校門から道路へ出よう。
+            </div>
+        </div>
+        <div class="action-btns">
+            <button type="button" id="btn-interact" class="btn-action bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-2xl border border-white/40 text-white font-black flex flex-col items-center justify-center gap-0.5">
+                <i data-lucide="message-circle" class="w-5 h-5 text-emerald-200"></i>
+                <span class="text-[10px]">話す</span>
+            </button>
+            <button type="button" id="btn-attack" class="btn-action bg-gradient-to-tr from-red-600 to-pink-500 rounded-2xl border border-white/40 text-white font-black flex flex-col items-center justify-center gap-0.5">
+                <i data-lucide="sword" class="w-5 h-5"></i>
+                <span class="text-[10px]">攻撃</span>
+            </button>
+            <button type="button" id="btn-dash" class="btn-action bg-gradient-to-tr from-cyan-600 to-blue-500 rounded-2xl border border-white/40 text-white font-black flex flex-col items-center justify-center gap-0.5">
+                <i data-lucide="zap" class="w-5 h-5"></i>
+                <span class="text-[10px]">回避</span>
+            </button>
+            <button type="button" id="btn-weapon" class="btn-action bg-gradient-to-tr from-amber-600 to-orange-500 rounded-2xl border border-white/40 text-white font-black flex flex-col items-center justify-center gap-0.5">
+                <i data-lucide="refresh-cw" class="w-5 h-5"></i>
+                <span class="text-[10px]">武器</span>
+            </button>
+            <button type="button" id="btn-skill" class="btn-action bg-gradient-to-tr from-purple-600 to-indigo-500 rounded-2xl border border-white/40 text-white font-black flex flex-col items-center justify-center gap-0.5">
+                <i data-lucide="sparkles" class="w-5 h-5 text-yellow-300"></i>
+                <span class="text-[10px]">必殺</span>
+            </button>
+            <button type="button" id="btn-inventory" class="btn-action glass-panel rounded-2xl border border-slate-600 text-slate-200 font-black flex flex-col items-center justify-center gap-0.5">
+                <i data-lucide="briefcase" class="w-5 h-5 text-amber-400"></i>
+                <span class="text-[10px]">道具</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+    <script src="combat.js"></script>
+    <script src="shops.js"></script>
+    <script src="enemies.js"></script>
+    <script src="school-map.js"></script>
+    <script>
+        // Lucideアイコンの初期化
+        lucide.createIcons();
+
+        // -------------------------------------------------------------
+        // GAME CONFIG & ENGINE STATE
+        // -------------------------------------------------------------
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const minimapCanvas = document.getElementById('minimap-canvas');
+        const miniCtx = minimapCanvas.getContext('2d');
+
+        function cssView() {
+            return {
+                w: canvas.clientWidth || 1,
+                h: canvas.clientHeight || 1
+            };
+        }
+
+        function canvasDpr() {
+            const view = cssView();
+            return canvas.width / view.w;
+        }
+
+        function resizeCanvas() {
+            const stage = document.getElementById('game-stage');
+            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const W = stage ? stage.clientWidth : window.innerWidth;
+            const H = stage ? stage.clientHeight : Math.floor(window.innerHeight * 0.75);
+            canvas.width = Math.max(1, (W * dpr) | 0);
+            canvas.height = Math.max(1, (H * dpr) | 0);
+            canvas.style.width = W + 'px';
+            canvas.style.height = H + 'px';
+            ctx.imageSmoothingEnabled = false;
+            minimapCanvas.width = 112;
+            minimapCanvas.height = 80;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', () => setTimeout(resizeCanvas, 80));
+        resizeCanvas();
+
+        // ゲームシステム統合ステート
+        const GameState = {
+            started: false,
+            paused: false,
+            currentArea: 'SCHOOL', // SCHOOL, ROAD, SHOPPING, PARK
+            questStep: 0,
+            money: 100,
+            inventory: [
+                { id: 'yakisoba_pan', name: '焼きそばパン', count: 2, icon: '🥖', hpRestore: 40, desc: 'HPを40回復する。' },
+                { id: 'pocari', name: 'スポーツドリンク', count: 1, icon: '🥤', hpRestore: 80, desc: 'HPを80回復する。' }
+            ],
+            dialogActive: false,
+            dialogQueue: [],
+            dialogCallback: null,
+            audioInitialized: false,
+            skeletalReady: false,
+            weapon: 'yoyo',
+            bossPhase: 1,
+            minigame: null,
+            portalLock: 0
+        };
+        window.GameState = GameState;
+
+        const combatFeel = new CombatKit.CombatFeel();
+        const comboRank = new CombatKit.ComboRank();
+        const projectiles = new CombatKit.ProjectilePool(48);
+        const breakables = new CombatKit.DestructibleField();
+        const invaderGame = new ShopKit.InvaderGame();
+
+        // =====================================================================
+        // HERO SPRITE ATLAS (transparent sheet extracted from concept art)
+        // =====================================================================
+        const HERO_SPRITE_URL = './images/hero-sheet.png';
+        const HERO_DRAW_SCALE = 2;
+        const HERO_VISUAL_H = 66 * HERO_DRAW_SCALE;
+        const CHAR_TALK_RANGE = Math.round(HERO_VISUAL_H * 0.9);
+
+        const CHAR_ART_URLS = {
+            delinquent: './images/char-delinquent.svg',
+            teacher: './images/char-teacher.svg',
+            baker: './images/char-baker.svg',
+            boss: './images/char-boss.svg',
+            dog: './images/char-dog.svg',
+            cat: './images/char-cat.svg',
+            auntie: './images/char-auntie.svg',
+            grandpa: './images/char-grandpa.svg',
+            child: './images/char-child.svg',
+            kinjiro: './images/char-kinjiro.svg',
+            chicken: './images/char-chicken.svg',
+            rabbit: './images/char-rabbit.svg',
+            bike_kid: './images/char-bike-kid.svg'
+        };
+        const CHAR_ART = {};
+
+        function charArtKey(kind) {
+            if (kind === 'stray_dog') return 'dog';
+            if (kind === 'bakery_owner') return 'baker';
+            if (kind === 'dagashi_owner') return 'teacher';
+            if (kind === 'arcade_clerk') return 'delinquent';
+            if (kind === 'shopper_auntie' || kind === 'shopper_auntie2') return 'auntie';
+            if (kind === 'shopper_grandpa') return 'grandpa';
+            if (kind === 'shopper_child' || kind === 'shopper_child2') return 'child';
+            return kind;
+        }
+
+        function loadCharArt() {
+            return Promise.all(Object.keys(CHAR_ART_URLS).map((key) => new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => { CHAR_ART[key] = img; resolve(); };
+                img.onerror = () => resolve();
+                img.src = CHAR_ART_URLS[key];
+            })));
+        }
+
+        function charArtHeight(kind) {
+            const img = CHAR_ART[charArtKey(kind)];
+            if (!img) return HERO_VISUAL_H;
+            return (img.naturalHeight || img.height) * HERO_DRAW_SCALE;
+        }
+
+        function drawGroundShadow(ctx, x, y, size) {
+            ctx.save();
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            const hw = Math.max(10, (size * 0.22) | 0);
+            const hh = Math.max(4, (size * 0.08) | 0);
+            ctx.fillRect((x - hw) | 0, (y - hh + 2) | 0, hw * 2, hh * 2);
+            ctx.restore();
+        }
+
+        function drawCharArt(ctx, kind, x, y, facing = 'down', flipOverride = null, anim = {}) {
+            const img = CHAR_ART[charArtKey(kind)];
+            const bob = anim.bob || 0;
+            const drawY = y + bob;
+            if (!img) {
+                drawGroundShadow(ctx, x, drawY, 48);
+                return 48;
+            }
+            const artScale = HERO_DRAW_SCALE * (anim.scale || 1);
+            const w = (img.naturalWidth || img.width) * artScale;
+            const h = (img.naturalHeight || img.height) * artScale;
+            drawGroundShadow(ctx, x, drawY, h);
+            ctx.save();
+            ctx.imageSmoothingEnabled = false;
+            ctx.translate(x | 0, drawY | 0);
+            if (anim.squash && anim.squash !== 1) ctx.scale(1, anim.squash);
+            const facesLeftByDefault = flipOverride === true;
+            const shouldFlip = facesLeftByDefault
+                ? (facing === 'right')
+                : (facing === 'left');
+            if (shouldFlip) ctx.scale(-1, 1);
+            ctx.drawImage(img, (-w / 2) | 0, -h | 0, w | 0, h | 0);
+            ctx.restore();
+            return h;
+        }
+
+        function facingToward(fromX, toX) {
+            return toX < fromX ? 'left' : 'right';
+        }
+        const HERO_FRAMES = {"walk_up": [{"sx": 2, "sy": 4, "w": 39, "h": 65, "dx": -20, "dy": -59}, {"sx": 43, "sy": 2, "w": 38, "h": 67, "dx": -19, "dy": -61}, {"sx": 83, "sy": 3, "w": 41, "h": 66, "dx": -21, "dy": -60}, {"sx": 126, "sy": 8, "w": 38, "h": 61, "dx": -19, "dy": -55}], "walk_down": [{"sx": 2, "sy": 73, "w": 43, "h": 43, "dx": -22, "dy": -37}, {"sx": 47, "sy": 75, "w": 42, "h": 41, "dx": -21, "dy": -35}, {"sx": 91, "sy": 75, "w": 42, "h": 41, "dx": -21, "dy": -35}, {"sx": 135, "sy": 73, "w": 42, "h": 43, "dx": -21, "dy": -37}], "walk_left": [{"sx": 2, "sy": 123, "w": 36, "h": 59, "dx": -18, "dy": -53}, {"sx": 40, "sy": 122, "w": 36, "h": 60, "dx": -18, "dy": -54}, {"sx": 78, "sy": 123, "w": 36, "h": 59, "dx": -18, "dy": -53}, {"sx": 116, "sy": 120, "w": 36, "h": 62, "dx": -18, "dy": -56}], "walk_right": [{"sx": 2, "sy": 186, "w": 36, "h": 62, "dx": -18, "dy": -56}, {"sx": 40, "sy": 186, "w": 35, "h": 62, "dx": -18, "dy": -56}, {"sx": 77, "sy": 186, "w": 35, "h": 62, "dx": -18, "dy": -56}, {"sx": 114, "sy": 187, "w": 35, "h": 61, "dx": -18, "dy": -55}], "idle_down": [{"sx": 2, "sy": 252, "w": 34, "h": 66, "dx": -17, "dy": -60}], "idle_up": [{"sx": 2, "sy": 322, "w": 36, "h": 66, "dx": -18, "dy": -60}], "hurt": [{"sx": 2, "sy": 392, "w": 39, "h": 68, "dx": -20, "dy": -62}], "victory": [{"sx": 2, "sy": 464, "w": 40, "h": 65, "dx": -20, "dy": -59}], "flute_idle": [{"sx": 2, "sy": 533, "w": 37, "h": 77, "dx": -19, "dy": -71}], "flute_raise": [{"sx": 2, "sy": 614, "w": 47, "h": 77, "dx": -24, "dy": -71}], "flute_play": [{"sx": 2, "sy": 695, "w": 47, "h": 77, "dx": -24, "dy": -71}], "flute_shot": [{"sx": 2, "sy": 776, "w": 45, "h": 74, "dx": -23, "dy": -68}], "yoyo_idle": [{"sx": 2, "sy": 854, "w": 36, "h": 74, "dx": -18, "dy": -68}], "yoyo_throw": [{"sx": 2, "sy": 932, "w": 73, "h": 68, "dx": -37, "dy": -62}], "yoyo_spin_a": [{"sx": 2, "sy": 1004, "w": 63, "h": 67, "dx": -32, "dy": -61}], "yoyo_spin_b": [{"sx": 2, "sy": 1075, "w": 72, "h": 70, "dx": -36, "dy": -64}], "yoyo_spin_c": [{"sx": 2, "sy": 1149, "w": 98, "h": 72, "dx": -49, "dy": -66}], "yoyo_hit_a": [{"sx": 2, "sy": 1225, "w": 69, "h": 67, "dx": -35, "dy": -61}], "yoyo_hit_b": [{"sx": 2, "sy": 1296, "w": 85, "h": 67, "dx": -43, "dy": -61}], "yoyo_hit_c": [{"sx": 2, "sy": 1367, "w": 80, "h": 67, "dx": -40, "dy": -61}], "yoyo_hit_d": [{"sx": 2, "sy": 1438, "w": 71, "h": 67, "dx": -36, "dy": -61}], "idle": [{"sx": 2, "sy": 252, "w": 34, "h": 66, "dx": -17, "dy": -60}], "idle_left": [{"sx": 2, "sy": 123, "w": 36, "h": 59, "dx": -18, "dy": -53}], "idle_right": [{"sx": 2, "sy": 186, "w": 36, "h": 62, "dx": -18, "dy": -56}], "attack": [{"sx": 2, "sy": 932, "w": 73, "h": 68, "dx": -37, "dy": -62}, {"sx": 2, "sy": 1004, "w": 63, "h": 67, "dx": -32, "dy": -61}, {"sx": 2, "sy": 1296, "w": 85, "h": 67, "dx": -43, "dy": -61}], "dash": [{"sx": 2, "sy": 464, "w": 40, "h": 65, "dx": -20, "dy": -59}]};
+
+        class SkeletalAnimator {
+            constructor() {
+                this.spriteImage = null;
+                this.frameMap = {};
+                this.isLoaded = false;
+            }
+
+            async loadSprite(url) {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        this.spriteImage = img;
+                        this.isLoaded = true;
+                        resolve();
+                    };
+                    img.onerror = () => resolve();
+                    img.src = url;
+                });
+            }
+
+            defineFrames(actionName, frames) {
+                this.frameMap[actionName] = frames;
+            }
+
+            drawFrame(ctx, actionName, frameIndex, x, y, direction = 'down', scale = HERO_DRAW_SCALE) {
+                if (!this.isLoaded || !this.frameMap[actionName]) return;
+
+                const frames = this.frameMap[actionName];
+                const frame = frames[frameIndex % frames.length];
+                const alreadyLeft = actionName.indexOf('left') !== -1;
+
+                ctx.save();
+                ctx.imageSmoothingEnabled = false;
+                ctx.translate(x | 0, y | 0);
+
+                if (direction === 'left' && !alreadyLeft) ctx.scale(-1, 1);
+
+                ctx.drawImage(
+                    this.spriteImage,
+                    frame.sx, frame.sy, frame.w, frame.h,
+                    (frame.dx * scale) | 0, (frame.dy * scale) | 0,
+                    (frame.w * scale) | 0, (frame.h * scale) | 0
+                );
+
+                ctx.restore();
+            }
+        }
+
+        const skeletal = new SkeletalAnimator();
+
+        // -------------------------------------------------------------
+        // PROGRAM 8: TONE.JS AUDIOMANAGER (プロシージャル音源＆BGM)
+        // -------------------------------------------------------------
+        class SoundEngine {
+            constructor() {
+                this.synth = null;
+                this.bgmSynth = null;
+                this.loop = null;
+            }
+
+            init() {
+                if (GameState.audioInitialized) return;
+                try {
+                    Tone.start();
+                    this.synth = new Tone.PolySynth(Tone.Synth).toDestination();
+                    this.synth.volume.value = -10;
+
+                    this.bgmSynth = new Tone.MembraneSynth().toDestination();
+                    this.bgmSynth.volume.value = -16;
+
+                    // 簡易レトロBGMループ
+                    const notes = ["C3", "E3", "G3", "B3", "A3", "F3", "G3", "C4"];
+                    let index = 0;
+                    Tone.Transport.scheduleRepeat((time) => {
+                        if (GameState.started && !GameState.paused) {
+                            let note = notes[index % notes.length];
+                            if (GameState.currentArea === 'PARK') note = "C2";
+                            if (GameState.currentArea === 'BAKERY') note = "E4";
+                            if (GameState.currentArea === 'DAGASHI') note = "A4";
+                            if (GameState.currentArea === 'ARCADE') note = "G3";
+                            this.bgmSynth.triggerAttackRelease(note, "8n", time);
+                            index++;
+                        }
+                    }, "4n");
+
+                    Tone.Transport.bpm.value = 120;
+                    Tone.Transport.start();
+                    GameState.audioInitialized = true;
+                } catch (e) {
+                    GameState.audioInitialized = true;
+                }
+            }
+
+            playAttack() {
+                if (!GameState.audioInitialized) return;
+                this.synth.triggerAttackRelease(["C4", "E4"], "16n");
+            }
+
+            playHit() {
+                if (!GameState.audioInitialized) return;
+                this.synth.triggerAttackRelease(["G2", "C3"], "16n");
+            }
+
+            playLevelUp() {
+                if (!GameState.audioInitialized) return;
+                this.synth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "8n");
+            }
+
+            playDash() {
+                if (!GameState.audioInitialized) return;
+                this.synth.triggerAttackRelease(["A4", "E5"], "32n");
+            }
+
+            playJust() {
+                if (!GameState.audioInitialized) return;
+                this.synth.triggerAttackRelease(["E5", "G5", "C6"], "16n");
+            }
+
+            playYoyo() {
+                if (!GameState.audioInitialized) return;
+                this.synth.triggerAttackRelease(["A3", "E4"], "16n");
+            }
+
+            playFlute() {
+                if (!GameState.audioInitialized) return;
+                this.synth.triggerAttackRelease(["G4", "B4", "D5"], "8n");
+            }
+
+            playBreak() {
+                if (!GameState.audioInitialized) return;
+                this.synth.triggerAttackRelease(["C2", "G2", "C3"], "8n");
+            }
+
+            setCombatBpm(bpm) {
+                if (!GameState.audioInitialized || !window.Tone) return;
+                try { Tone.Transport.bpm.rampTo(bpm, 0.25); } catch (e) { /* ignore */ }
+            }
+        }
+        const audio = new SoundEngine();
+
+        // -------------------------------------------------------------
+        // PROGRAM 1: MAPS & SEAMLESS AREA MANAGER (ワールドマップ定義)
+        // -------------------------------------------------------------
+        const WORLD_WIDTH = 1600;
+        const WORLD_HEIGHT = 1200;
+
+        const MAP_AREAS = {
+            SCHOOL: {
+                name: "北校舎前グラウンド",
+                bgColor: "#3d6b34",
+                bounds: { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT },
+                portals: [
+                    { x: WORLD_WIDTH / 2 - 60, y: WORLD_HEIGHT - 30, w: 120, h: 30, target: 'ROAD', spawnX: WORLD_WIDTH / 2, spawnY: 340, reqQuest: 0 }
+                ],
+                decorations: [
+                    { type: 'school_plaza', x: 200, y: 286, w: 1200, h: 130 },
+                    { type: 'school_field', x: 260, y: 430, w: 1080, h: 600 },
+                    { type: 'school_building', x: 200, y: 36, w: 1200, h: 236 },
+                    { type: 'school_gym', x: 28, y: 300, w: 188, h: 210 },
+                    { type: 'school_shed', x: 1390, y: 338, w: 150, h: 96 },
+                    { type: 'school_flag', x: 248, y: 400 },
+                    { type: 'school_stand', x: 1324, y: 508 },
+                    { type: 'school_bars', x: 148, y: 760 },
+                    { type: 'school_backstop', x: 360, y: 1004, w: 170, h: 46 },
+                    { type: 'school_gate', x: 680, y: 1110, w: 240, h: 78 },
+                    { type: 'school_fence', x: 0, y: 274, w: 196, h: 12 },
+                    { type: 'school_fence', x: 1404, y: 274, w: 196, h: 12 },
+                    { type: 'flower_bed', x: 280, y: 308, w: 150, h: 32 },
+                    { type: 'flower_bed', x: 1170, y: 308, w: 150, h: 32 },
+                    { type: 'goal_net', x: 238, y: 620, w: 22, h: 150 },
+                    { type: 'goal_net', x: 1368, y: 620, w: 22, h: 150 },
+                    { type: 'tree', x: 90, y: 560 }, { type: 'tree', x: 1510, y: 560 },
+                    { type: 'tree', x: 110, y: 900 }, { type: 'tree', x: 1490, y: 900 },
+                    { type: 'tree', x: 70, y: 1080 }, { type: 'tree', x: 1530, y: 1080 }
+                ],
+                npcs: [
+                    { 
+                        id: 'teacher', 
+                        name: '担任の先生', 
+                        x: 800, 
+                        y: 340,
+                        behavior: 'idle_shift',
+                        patrolRadius: 55,
+                        speed: 0.85,
+                        sprite: '👨‍🏫', 
+                        dialog: function() {
+                            if (player.hp < player.maxHp) {
+                                player.hp = player.maxHp;
+                                updateHUD();
+                                vfxManager.addDamageText(player.x, player.y - 30, 'HP全回復!', '#4ade80');
+                                audio.playLevelUp();
+                                return [
+                                    "顔色があまり良くないな…よし、手当てをしてあげよう！",
+                                    "（先生に手当てを受け、HPが全回復した！）",
+                                    "公園の暗黒校長は強力だ。商店街で焼きそばパンを買って回復アイテムを準備しておくといいぞ！"
+                                ];
+                            }
+                            return [
+                                "おお、よく来たな！いま学校の外が大変なことになっているんだ！",
+                                "公園に現れた怪しい影…あれは正気を失った『暗黒校長』だ！",
+                                "校門を出て道路・商店街を抜け、公園の暗黒校長を倒して学校の平和を取り戻してくれ！",
+                                "体力が減ったらここに戻ってくれば、いつでも手当てしてやるぞ！"
+                            ];
+                        } 
+                    }
+                ]
+            },
+            ROAD: {
+                name: "夕暮れの通学道路",
+                bgColor: "#2f4538",
+                bounds: { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT },
+                portals: [
+                    { x: WORLD_WIDTH / 2 - 60, y: 0, w: 120, h: 30, target: 'SCHOOL', spawnX: WORLD_WIDTH / 2, spawnY: WORLD_HEIGHT - 100 },
+                    { x: WORLD_WIDTH - 30, y: WORLD_HEIGHT / 2 - 60, w: 30, h: 120, target: 'SHOPPING', spawnX: 80, spawnY: WORLD_HEIGHT / 2 }
+                ],
+                decorations: [
+                    { type: 'road_shoulder', side: 'left', x: 0, y: 280, w: 380, h: 720 },
+                    { type: 'road_shoulder', side: 'right', x: 1220, y: 280, w: 380, h: 720 },
+                    { type: 'road_carriageway', x: 380, y: 280, w: 840, h: 720 },
+                    { type: 'crosswalk', x: 380, y: 470, w: 840, h: 96 },
+                    { type: 'road_grass', x: 0, y: 0, w: WORLD_WIDTH, h: 280 },
+                    { type: 'road_grass', x: 0, y: 1000, w: WORLD_WIDTH, h: 200 },
+                    { type: 'traffic_light', x: 348, y: 452, side: 'left' },
+                    { type: 'traffic_light', x: 1252, y: 452, side: 'right' },
+                    { type: 'tree', x: 140, y: 520 },
+                    { type: 'tree', x: 1460, y: 720 },
+                    { type: 'tree', x: 160, y: 900 },
+                    { type: 'tree', x: 1440, y: 420 }
+                ],
+                npcs: [
+                    { id: 'cat', name: '街の野良猫', x: 220, y: 560, sprite: '🐈', behavior: 'wander', patrolRadius: 110, speed: 1.6, dialog: ["ニャー（東の商店街で美味しい焼きそばパンが売ってるニャ）"] }
+                ]
+            },
+            SHOPPING: {
+                name: "昭和レトロ商店街",
+                bgColor: "#475569",
+                bounds: { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT },
+                portals: [
+                    { x: 0, y: WORLD_HEIGHT / 2 - 60, w: 30, h: 120, target: 'ROAD', spawnX: WORLD_WIDTH - 100, spawnY: WORLD_HEIGHT / 2 },
+                    { x: WORLD_WIDTH / 2 - 60, y: WORLD_HEIGHT - 30, w: 120, h: 30, target: 'PARK', spawnX: WORLD_WIDTH / 2, spawnY: 80 },
+                    { x: 288, y: 352, w: 74, h: 40, target: 'BAKERY', spawnX: WORLD_WIDTH / 2, spawnY: 1000 },
+                    { x: 638, y: 352, w: 74, h: 40, target: 'DAGASHI', spawnX: WORLD_WIDTH / 2, spawnY: 1000 },
+                    { x: 1013, y: 352, w: 74, h: 40, target: 'ARCADE', spawnX: WORLD_WIDTH / 2, spawnY: 1000 }
+                ],
+                decorations: [
+                    { type: 'shopping_street', x: 0, y: 380, w: WORLD_WIDTH, h: 420 },
+                    { type: 'shop', name: 'パン屋', x: 200, y: 200, w: 250, h: 180, color: '#f59e0b', awning: '#dc2626', enter: true },
+                    { type: 'shop', name: '駄菓子屋', x: 550, y: 200, w: 250, h: 180, color: '#ef4444', awning: '#2563eb', enter: true },
+                    { type: 'shop', name: 'ゲームセンター', x: 900, y: 200, w: 300, h: 180, color: '#8b5cf6', awning: '#f59e0b', enter: true },
+                    { type: 'lantern', x: 480, y: 360 }, { type: 'lantern', x: 820, y: 360 },
+                    { type: 'lantern', x: 1240, y: 360 }
+                ],
+                npcs: [
+                    { id: 'shopper_auntie', name: '買い物のおばさん', x: 360, y: 520, behavior: 'shopper', patrolRadius: 520, speed: 1.35, dialog: ["パン屋の焼きそばパン、今日も行列よ。"] },
+                    { id: 'shopper_auntie2', name: '特売狙いのおばさん', x: 1100, y: 610, behavior: 'shopper', patrolRadius: 480, speed: 1.15, dialog: ["駄菓子屋のくじ、大当たりが出た人を見たのよ。"] },
+                    { id: 'shopper_grandpa', name: '散歩の爺さん', x: 700, y: 560, behavior: 'shopper', patrolRadius: 400, speed: 0.7, dialog: ["この通りは夕方になると人が増えてな。"] },
+                    { id: 'shopper_child', name: '駄菓子目当ての子供', x: 480, y: 700, behavior: 'shopper', patrolRadius: 300, speed: 1.85, dialog: ["ゲームセンターのインベーダー、僕もやりたい！"] },
+                    { id: 'shopper_child2', name: '駆け回る子供', x: 980, y: 740, behavior: 'shopper', patrolRadius: 260, speed: 2.05, dialog: ["滑り台は公園だよ。こっちはお店！"] }
+                ]
+            },
+            BAKERY: {
+                name: "パン屋『小麦亭』",
+                bgColor: "#c4a574",
+                bounds: { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT },
+                portals: [
+                    { x: WORLD_WIDTH / 2 - 60, y: WORLD_HEIGHT - 40, w: 120, h: 40, target: 'SHOPPING', spawnX: 325, spawnY: 430 }
+                ],
+                decorations: [
+                    { type: 'room_wall', x: 260, y: 140, w: 1080, h: 28 },
+                    { type: 'room_wall', x: 260, y: 1052, w: 360, h: 28 },
+                    { type: 'room_wall', x: 980, y: 1052, w: 360, h: 28 },
+                    { type: 'room_wall', x: 260, y: 140, w: 28, h: 940 },
+                    { type: 'room_wall', x: 1312, y: 140, w: 28, h: 940 },
+                    { type: 'counter', x: 480, y: 520, w: 640, h: 70 },
+                    { type: 'oven', x: 1180, y: 420, w: 110, h: 160 }
+                ],
+                npcs: [
+                    { id: 'bakery_owner', name: 'パン屋の店主', x: 800, y: 500, sprite: '🍞', behavior: 'pace_h', patrolRadius: 90, speed: 0.8, shopItem: 'yakisoba_pan', price: 50, dialog: ["いらっしゃい！焼きそばパン(50円)で元気を回復していきな！"] }
+                ]
+            },
+            DAGASHI: {
+                name: "駄菓子屋『うさぎや』",
+                bgColor: "#3f2a22",
+                bounds: { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT },
+                portals: [
+                    { x: WORLD_WIDTH / 2 - 60, y: WORLD_HEIGHT - 40, w: 120, h: 40, target: 'SHOPPING', spawnX: 675, spawnY: 430 }
+                ],
+                decorations: [
+                    { type: 'room_wall', x: 240, y: 130, w: 1120, h: 36 },
+                    { type: 'room_wall', x: 240, y: 1054, w: 380, h: 36 },
+                    { type: 'room_wall', x: 980, y: 1054, w: 380, h: 36 },
+                    { type: 'room_wall', x: 240, y: 130, w: 36, h: 960 },
+                    { type: 'room_wall', x: 1324, y: 130, w: 36, h: 960 },
+                    { type: 'kuji', x: 620, y: 620, w: 360, h: 220 }
+                ],
+                npcs: [
+                    { id: 'dagashi_owner', name: '駄菓子屋のおばちゃん', x: 1080, y: 720, sprite: '👵', behavior: 'idle_shift', patrolRadius: 40, speed: 0.5, dialog: ["くじ引きは20円だよ。大当たりが出るかもね！"] }
+                ]
+            },
+            ARCADE: {
+                name: "ゲームセンター『放課後BOX』",
+                bgColor: "#0b0614",
+                bounds: { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT },
+                portals: [
+                    { x: WORLD_WIDTH / 2 - 60, y: WORLD_HEIGHT - 40, w: 120, h: 40, target: 'SHOPPING', spawnX: 1050, spawnY: 430 }
+                ],
+                decorations: [
+                    { type: 'room_wall', x: 220, y: 120, w: 1160, h: 24 },
+                    { type: 'room_wall', x: 220, y: 1082, w: 400, h: 24 },
+                    { type: 'room_wall', x: 980, y: 1082, w: 400, h: 24 },
+                    { type: 'room_wall', x: 220, y: 120, w: 24, h: 986 },
+                    { type: 'room_wall', x: 1356, y: 120, w: 24, h: 986 },
+                    { type: 'cabinet', x: 320, y: 280, w: 140, h: 200 },
+                    { type: 'cabinet', x: 520, y: 280, w: 140, h: 200 },
+                    { type: 'cabinet', x: 920, y: 280, w: 140, h: 200 },
+                    { type: 'cabinet', x: 1120, y: 280, w: 140, h: 200 },
+                    { type: 'invader_cab', x: 680, y: 520, w: 240, h: 280 }
+                ],
+                npcs: [
+                    { id: 'arcade_clerk', name: 'アルバイト', x: 400, y: 860, sprite: '😼', behavior: 'wander', patrolRadius: 80, speed: 1.1, dialog: ["インベーダーは中央の筐体だ。スコアがそのまま小遣いになるぞ。"] }
+                ]
+            },
+            PARK: {
+                name: "決戦のさくら公園",
+                bgColor: "#1e293b",
+                bounds: { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT },
+                portals: [
+                    { x: WORLD_WIDTH / 2 - 60, y: 0, w: 120, h: 30, target: 'SHOPPING', spawnX: WORLD_WIDTH / 2, spawnY: WORLD_HEIGHT - 100 }
+                ],
+                decorations: [
+                    { type: 'sandbox', x: 180, y: 640, w: 460, h: 300 },
+                    { type: 'sandbox', x: 980, y: 640, w: 440, h: 300 },
+                    { type: 'fountain', x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2, r: 88 },
+                    { type: 'swing', x: 320, y: 780 },
+                    { type: 'seesaw', x: 1220, y: 800 },
+                    { type: 'slide', x: 1080, y: 980 },
+                    { type: 'bench', x: 500, y: 500 }, { type: 'bench', x: 1100, y: 500 },
+                    { type: 'cherry_tree', x: 200, y: 200 }, { type: 'cherry_tree', x: 1400, y: 200 },
+                    { type: 'cherry_tree', x: 200, y: 1000 }, { type: 'cherry_tree', x: 1400, y: 1000 }
+                ],
+                npcs: []
+            }
+        };
+
+        // -------------------------------------------------------------
+        // COLLISION: building / obstacle blocking
+        // -------------------------------------------------------------
+        function getAreaColliders(areaKey) {
+            const rects = [];
+            MAP_AREAS[areaKey].decorations.forEach((dec) => {
+                const schoolRects = SchoolMap && SchoolMap.collider(dec);
+                if (schoolRects) {
+                    schoolRects.forEach((r) => rects.push(r));
+                } else if (dec.type === 'shop') {
+                    const doorW = 74;
+                    const doorX = dec.x + dec.w / 2 - doorW / 2;
+                    const top = dec.y + 52;
+                    const bodyH = dec.h - 50;
+                    rects.push({ x: dec.x + 8, y: top, w: dec.w - 16, h: bodyH - 30 });
+                    rects.push({ x: dec.x + 8, y: top + bodyH - 30, w: doorX - dec.x - 8, h: 30 });
+                    rects.push({ x: doorX + doorW, y: top + bodyH - 30, w: dec.x + dec.w - 8 - doorX - doorW, h: 30 });
+                } else if (dec.type === 'room_wall' || dec.type === 'counter' || dec.type === 'oven' || dec.type === 'cabinet') {
+                    rects.push({ x: dec.x, y: dec.y, w: dec.w, h: dec.h });
+                } else if (dec.type === 'kuji' || dec.type === 'invader_cab') {
+                    rects.push({ x: dec.x + 16, y: dec.y + 20, w: dec.w - 32, h: dec.h - 40 });
+                } else if (dec.type === 'tree' || dec.type === 'cherry_tree') {
+                    rects.push({ x: dec.x - 22, y: dec.y - 10, w: 44, h: 28 });
+                } else if (dec.type === 'fountain') {
+                    rects.push({ x: dec.x - dec.r * 0.75, y: dec.y - dec.r * 0.35, w: dec.r * 1.5, h: dec.r * 0.9 });
+                } else if (dec.type === 'road_grass') {
+                    rects.push({ x: dec.x, y: dec.y, w: dec.w, h: dec.h });
+                } else if (dec.type === 'lantern') {
+                    rects.push({ x: dec.x - 12, y: dec.y - 8, w: 24, h: 20 });
+                } else if (dec.type === 'swing') {
+                    rects.push({ x: dec.x - 70, y: dec.y - 8, w: 16, h: 20 });
+                    rects.push({ x: dec.x + 54, y: dec.y - 8, w: 16, h: 20 });
+                } else if (dec.type === 'seesaw') {
+                    rects.push({ x: dec.x - 18, y: dec.y - 6, w: 36, h: 22 });
+                } else if (dec.type === 'slide') {
+                    rects.push({ x: dec.x - 10, y: dec.y - 20, w: 90, h: 36 });
+                }
+            });
+            return rects;
+        }
+
+        function resolveCircleRectCollision(x, y, radius, rect) {
+            const closestX = Math.max(rect.x, Math.min(x, rect.x + rect.w));
+            const closestY = Math.max(rect.y, Math.min(y, rect.y + rect.h));
+            const dx = x - closestX;
+            const dy = y - closestY;
+            const distSq = dx * dx + dy * dy;
+            if (distSq >= radius * radius) return { x, y };
+            if (distSq === 0) {
+                const leftPen = x - rect.x;
+                const rightPen = rect.x + rect.w - x;
+                const topPen = y - rect.y;
+                const bottomPen = rect.y + rect.h - y;
+                const minPen = Math.min(leftPen, rightPen, topPen, bottomPen);
+                if (minPen === leftPen) return { x: rect.x - radius, y };
+                if (minPen === rightPen) return { x: rect.x + rect.w + radius, y };
+                if (minPen === topPen) return { x, y: rect.y - radius };
+                return { x, y: rect.y + rect.h + radius };
+            }
+            const dist = Math.sqrt(distSq);
+            const push = radius - dist;
+            return { x: x + (dx / dist) * push, y: y + (dy / dist) * push };
+        }
+
+        function applyMapCollision(entity, areaKey) {
+            const colliders = getAreaColliders(areaKey);
+            for (let pass = 0; pass < 3; pass++) {
+                colliders.forEach((rect) => {
+                    const resolved = resolveCircleRectCollision(entity.x, entity.y, entity.radius, rect);
+                    entity.x = resolved.x;
+                    entity.y = resolved.y;
+                });
+            }
+        }
+
+        // -------------------------------------------------------------
+        // PROGRAM 2 & 3: PLAYER ENGINE & HITBOX / COMBAT MATRIX
+        // -------------------------------------------------------------
+        class Player {
+            constructor() {
+                this.x = WORLD_WIDTH / 2;
+                this.y = WORLD_HEIGHT / 2 + 100;
+                this.radius = 22;
+                this.speed = 4.5;
+                this.vx = 0;
+                this.vy = 0;
+                this.facing = 'down'; // up, down, left, right
+
+                // ステータス
+                this.level = 1;
+                this.hp = 100;
+                this.maxHp = 100;
+                this.exp = 0;
+                this.maxExp = 50;
+                this.atk = 18;
+                this.def = 5;
+                this.sp = 40;
+                this.maxSp = 100;
+                this._area = 'SCHOOL';
+                this._uid = 0;
+
+                // アクションステート
+                this.isAttacking = false;
+                this.comboStep = 0;
+                this.attackTimer = 0;
+                this.isDashing = false;
+                this.dashTimer = 0;
+                this.iFrames = 0; // 無敵時間
+                this.justDodgeLock = 0;
+
+                // 残像エフェクト用データ
+                this.ghosts = [];
+
+                // スケルタルアニメーション
+                this.animationState = 'idle_down';
+                this.frameIndex = 0;
+                this.frameTimer = 0;
+                this.frameSpeed = 6;
+                this.hurtTimer = 0;
+            }
+
+            gainSp(amount) {
+                this.sp = Math.min(this.maxSp, this.sp + amount);
+            }
+
+            cycleWeapon() {
+                GameState.weapon = GameState.weapon === 'yoyo' ? 'flute' : 'yoyo';
+                showNotification(GameState.weapon === 'yoyo' ? 'ヨーヨー装備！' : 'フルート装備！');
+                updateHUD();
+            }
+
+            update(keys) {
+                this._area = GameState.currentArea;
+                if (this.justDodgeLock > 0) this.justDodgeLock--;
+                // ダッシュ処理
+                if (this.isDashing) {
+                    this.dashTimer--;
+                    this.ghosts.push({ x: this.x, y: this.y, alpha: 0.6 });
+                    if (this.dashTimer <= 0) {
+                        this.isDashing = false;
+                    }
+                    this.animationState = 'dash';
+                } else {
+                    // 移動計算
+                    let dx = 0;
+                    let dy = 0;
+                    if (keys['ArrowUp'] || keys['KeyW']) dy -= 1;
+                    if (keys['ArrowDown'] || keys['KeyS']) dy += 1;
+                    if (keys['ArrowLeft'] || keys['KeyA']) dx -= 1;
+                    if (keys['ArrowRight'] || keys['KeyD']) dx += 1;
+
+                    if (dx !== 0 && dy !== 0) {
+                        dx *= 0.7071;
+                        dy *= 0.7071;
+                    }
+
+                    if (!this.isAttacking) {
+                        this.vx = dx * this.speed;
+                        this.vy = dy * this.speed;
+                        this.x += this.vx;
+                        this.y += this.vy;
+
+                        if (dx < 0) this.facing = 'left';
+                        if (dx > 0) this.facing = 'right';
+                        if (dy < 0) this.facing = 'up';
+                        if (dy > 0) this.facing = 'down';
+
+                        if (dx !== 0 || dy !== 0) {
+                            this.animationState = `walk_${this.facing}`;
+                        } else {
+                            this.animationState = `idle_${this.facing}`;
+                        }
+                    } else if (GameState.weapon === 'flute') {
+                        this.animationState = 'flute_play';
+                    } else {
+                        this.animationState = 'yoyo_throw';
+                    }
+                }
+
+                if (this.hurtTimer > 0) {
+                    this.hurtTimer--;
+                    if (!this.isAttacking && !this.isDashing) {
+                        this.animationState = 'hurt';
+                    }
+                }
+
+                // ワールド境界チェック
+                const currentBounds = MAP_AREAS[GameState.currentArea].bounds;
+                this.x = Math.max(this.radius, Math.min(currentBounds.w - this.radius, this.x));
+                this.y = Math.max(this.radius, Math.min(currentBounds.h - this.radius, this.y));
+                applyMapCollision(this, GameState.currentArea);
+
+                // タイマー減少
+                if (this.attackTimer > 0) {
+                    this.attackTimer--;
+                    if (this.attackTimer <= 0) {
+                        this.isAttacking = false;
+                    }
+                }
+                if (this.iFrames > 0) this.iFrames--;
+
+                // ゴースト減衰
+                this.ghosts.forEach(g => g.alpha -= 0.08);
+                this.ghosts = this.ghosts.filter(g => g.alpha > 0);
+
+                // フレーム更新（アニメーション）
+                this.frameTimer++;
+                if (this.frameTimer >= this.frameSpeed) {
+                    this.frameTimer = 0;
+                    this.frameIndex++;
+                }
+            }
+
+            attack() {
+                if (this.isAttacking || this.isDashing) return;
+                this.isAttacking = true;
+                this.comboStep = (this.comboStep % 3) + 1;
+                this.attackTimer = GameState.weapon === 'flute' ? 12 : 16;
+
+                const dir = CombatKit.facingVec(this.facing);
+                const shot = CombatKit.muzzle(this, 28);
+                if (GameState.weapon === 'flute') {
+                    audio.playFlute();
+                    this.animationState = this.comboStep === 3 ? 'flute_shot' : 'flute_play';
+                    const speed = 7 + this.comboStep;
+                    projectiles.spawn({
+                        x: shot.x,
+                        y: shot.y,
+                        vx: dir.x * speed,
+                        vy: dir.y * speed,
+                        life: 42,
+                        kind: 'note',
+                        radius: 9 + this.comboStep * 2,
+                        damage: Math.floor(this.atk * (0.7 + this.comboStep * 0.25)),
+                        poise: 6 + this.comboStep * 3,
+                        owner: 'player',
+                        note: this.comboStep
+                    });
+                    return;
+                }
+
+                audio.playYoyo();
+                this.animationState = this.comboStep === 2 ? 'yoyo_spin_a' : 'yoyo_throw';
+                const speed = 9;
+                const yo = CombatKit.muzzle(this, 20);
+                projectiles.spawn({
+                    x: yo.x,
+                    y: yo.y,
+                    vx: dir.x * speed,
+                    vy: dir.y * speed,
+                    life: 34,
+                    kind: 'yoyo',
+                    phase: 'out',
+                    homeX: yo.x,
+                    homeY: yo.y,
+                    radius: 14,
+                    damage: Math.floor(this.atk * (0.85 + this.comboStep * 0.22)),
+                    poise: 10 + this.comboStep * 4,
+                    owner: 'player',
+                    pull: this.comboStep === 3
+                });
+            }
+
+            tryJustDodge() {
+                if (this.justDodgeLock > 0) return false;
+                let ok = false;
+                enemies.forEach((enemy) => {
+                    if (!enemy.isAlive || enemy.area !== GameState.currentArea) return;
+                    if (!enemy.inJustWindow) return;
+                    if (Math.hypot(enemy.x - this.x, enemy.y - this.y) < 150) ok = true;
+                });
+                if (!ok) return false;
+                this.justDodgeLock = 20;
+                this.iFrames = 36;
+                this.gainSp(25);
+                comboRank.registerJust();
+                combatFeel.requestSlowMo(22, 0.28);
+                combatFeel.requestFlash(8);
+                camera.shake(16);
+                camera.zoomTo(1.22, 18);
+                audio.playJust();
+                vfxManager.addNova(this.x, this.y);
+                vfxManager.addDamageText(this.x, this.y - 50, 'JUST!', '#67e8f9');
+                showNotification('ジャスト回避！ SP増加');
+                audio.setCombatBpm(comboRank.rank.bpm);
+                if (navigator.vibrate) navigator.vibrate(20);
+                return true;
+            }
+
+            dash() {
+                if (this.isDashing || this.isAttacking) return;
+                this.isDashing = true;
+                this.dashTimer = 12;
+                this.iFrames = 18;
+                this.tryJustDodge();
+
+                let dashDist = 14;
+                if (this.facing === 'left') this.x -= dashDist * 8;
+                if (this.facing === 'right') this.x += dashDist * 8;
+                if (this.facing === 'up') this.y -= dashDist * 8;
+                if (this.facing === 'down') this.y += dashDist * 8;
+                applyMapCollision(this, GameState.currentArea);
+
+                audio.playDash();
+            }
+
+            useSkill() {
+                if (this.isAttacking || this.isDashing) return;
+                const cost = GameState.weapon === 'flute' ? 35 : 40;
+                if (this.sp < cost) {
+                    showNotification('SPが足りない！ ジャスト回避で貯めよう');
+                    return;
+                }
+                this.sp -= cost;
+                this.isAttacking = true;
+                this.attackTimer = 26;
+                updateHUD();
+
+                if (GameState.weapon === 'flute') {
+                    this.animationState = 'flute_shot';
+                    audio.playFlute();
+                    const origin = CombatKit.muzzle(this);
+                    vfxManager.addNova(origin.x, origin.y);
+                    for (let i = 0; i < 8; i++) {
+                        const a = (Math.PI * 2 / 8) * i;
+                        projectiles.spawn({
+                            x: origin.x,
+                            y: origin.y,
+                            vx: Math.cos(a) * 6.5,
+                            vy: Math.sin(a) * 6.5,
+                            life: 36,
+                            kind: 'note',
+                            radius: 12,
+                            damage: Math.floor(this.atk * 1.4),
+                            poise: 18,
+                            owner: 'player',
+                            note: i
+                        });
+                    }
+                    return;
+                }
+
+                this.animationState = 'yoyo_spin_c';
+                audio.playYoyo();
+                const origin = CombatKit.muzzle(this);
+                vfxManager.addNova(origin.x, origin.y);
+                camera.zoomTo(1.18, 16);
+                projectiles.spawn({
+                    x: origin.x + 70,
+                    y: origin.y,
+                    vx: 0,
+                    vy: 0,
+                    life: 28,
+                    kind: 'yoyo',
+                    homeX: origin.x,
+                    homeY: origin.y,
+                    radius: 18,
+                    damage: Math.floor(this.atk * 1.6),
+                    poise: 28,
+                    owner: 'player',
+                    spin: true,
+                    pull: true
+                });
+            }
+
+            takeDamage(amount) {
+                if (this.iFrames > 0) return;
+                const finalDmg = Math.max(1, amount - this.def);
+                this.hp = Math.max(0, this.hp - finalDmg);
+                this.iFrames = 30;
+                this.hurtTimer = 18;
+
+                camera.shake(10);
+                vfxManager.addDamageText(this.x, this.y - 30, `-${finalDmg}`, '#ef4444');
+                audio.playHit();
+
+                comboRank.reset();
+                audio.setCombatBpm(120);
+                if (this.hp <= 0) {
+                    showNotification("倒れてしまった！保健室(学校)へ戻された...");
+                    this.hp = this.maxHp;
+                    this.sp = Math.max(this.sp, 20);
+                    GameState.currentArea = 'SCHOOL';
+                    this.x = WORLD_WIDTH / 2;
+                    this.y = WORLD_HEIGHT / 2;
+                }
+            }
+
+            gainExp(amount) {
+                this.exp += amount;
+                vfxManager.addDamageText(this.x, this.y - 40, `+${amount} EXP`, '#38bdf8');
+                if (this.exp >= this.maxExp) {
+                    this.level++;
+                    this.exp -= this.maxExp;
+                    this.maxExp = Math.floor(this.maxExp * 1.5);
+                    this.maxHp += 20;
+                    this.hp = this.maxHp;
+                    this.atk += 5;
+                    this.def += 2;
+                    audio.playLevelUp();
+                    showNotification(`LEVEL UP! Lv.${this.level} に上がった！`);
+                }
+            }
+
+            draw(ctx) {
+                // ゴースト（ダッシュ残像）描画
+                this.ghosts.forEach(g => {
+                    ctx.save();
+                    ctx.globalAlpha = g.alpha;
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.beginPath();
+                    ctx.arc(g.x, g.y, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                // 無敵点滅
+                if (this.iFrames % 4 > 2) return;
+
+                ctx.save();
+                drawGroundShadow(ctx, this.x, this.y, HERO_VISUAL_H);
+
+                // スケルタルアニメーション描画
+                if (GameState.skeletalReady && skeletal.isLoaded) {
+                    skeletal.drawFrame(ctx, this.animationState, this.frameIndex, this.x, this.y, this.facing, HERO_DRAW_SCALE);
+                } else {
+                    // フォールバック：従来の円形描画
+                    ctx.translate(this.x, this.y);
+                    ctx.fillStyle = '#ec4899';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.lineWidth = 3;
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.stroke();
+                    ctx.fillStyle = '#fde047';
+                    ctx.beginPath();
+                    ctx.arc(0, -6, 12, Math.PI, 0);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+            }
+        }
+
+        // -------------------------------------------------------------
+        // MAP NPC MOB ENGINE (friendly mobs with patrol / wander)
+        // -------------------------------------------------------------
+        class MapNpc {
+            constructor(def, areaKey) {
+                this.def = def;
+                this.area = areaKey;
+                this.x = def.x;
+                this.y = def.y;
+                this.homeX = def.x;
+                this.homeY = def.y;
+                this.radius = 20;
+                this.facing = def.facing || 'down';
+                this.speed = def.speed || 1.1;
+                this.patrolRadius = def.patrolRadius ?? 70;
+                this.behavior = def.behavior || 'wander';
+                this.state = 'pause';
+                this.stateTimer = 20 + Math.random() * 50;
+                this.targetX = def.x;
+                this.targetY = def.y;
+                this.animTimer = Math.random() * 100;
+                this.isMoving = false;
+                this.paceDir = 1;
+            }
+
+            pickNewTarget() {
+                if (this.behavior === 'pace_h' || this.behavior === 'shopper') {
+                    this.paceDir *= -1;
+                    this.targetX = Math.max(80, Math.min(1520, this.homeX + this.patrolRadius * this.paceDir));
+                    this.targetY = this.homeY + (this.behavior === 'shopper' ? (Math.random() - 0.5) * 18 : 0);
+                } else if (this.behavior === 'idle_shift') {
+                    this.targetX = this.homeX + (Math.random() - 0.5) * this.patrolRadius;
+                    this.targetY = this.homeY + (Math.random() - 0.5) * this.patrolRadius * 0.45;
+                } else {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = 30 + Math.random() * this.patrolRadius;
+                    this.targetX = this.homeX + Math.cos(angle) * dist;
+                    this.targetY = this.homeY + Math.sin(angle) * dist;
+                }
+            }
+
+            updateFacing(dx, dy) {
+                if (Math.abs(dx) > Math.abs(dy) * 0.6) {
+                    this.facing = dx < 0 ? 'left' : 'right';
+                } else if (Math.abs(dy) > 0.4) {
+                    this.facing = dy < 0 ? 'up' : 'down';
+                }
+            }
+
+            getAnim() {
+                const bob = this.isMoving
+                    ? Math.sin(this.animTimer * 0.38) * 3.2
+                    : Math.sin(this.animTimer * 0.09) * 1.4;
+                const squash = this.isMoving
+                    ? 1 + Math.sin(this.animTimer * 0.38) * 0.04
+                    : 1;
+                return { bob, squash };
+            }
+
+            update() {
+                if (this.area !== GameState.currentArea) return;
+                this.animTimer++;
+
+                if (GameState.dialogActive) {
+                    this.isMoving = false;
+                    return;
+                }
+
+                if (this.state === 'pause') {
+                    this.isMoving = false;
+                    this.stateTimer--;
+                    if (this.stateTimer <= 0) {
+                        this.pickNewTarget();
+                        this.state = 'walk';
+                    }
+                    return;
+                }
+
+                const dx = this.targetX - this.x;
+                const dy = this.targetY - this.y;
+                const dist = Math.hypot(dx, dy);
+                if (dist < 3) {
+                    this.x = this.targetX;
+                    this.y = this.targetY;
+                    this.state = 'pause';
+                    this.stateTimer = this.behavior === 'shopper'
+                        ? 8 + Math.random() * 18
+                        : 35 + Math.random() * 90;
+                    this.isMoving = false;
+                    return;
+                }
+
+                this.x += (dx / dist) * this.speed;
+                this.y += (dy / dist) * this.speed;
+                this.isMoving = true;
+                this.updateFacing(dx, dy);
+                applyMapCollision(this, this.area);
+            }
+
+            draw(ctx) {
+                if (this.area !== GameState.currentArea) return;
+                const anim = this.getAnim();
+                const flipOverride = this.def.id === 'cat' ? true : null;
+                const h = drawCharArt(ctx, this.def.id, this.x, this.y, this.facing, flipOverride, anim);
+
+                ctx.save();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(this.def.name, this.x, this.y - h - 6 + (anim.bob || 0));
+
+                const dist = Math.hypot(player.x - this.x, player.y - this.y);
+                if (dist < CHAR_TALK_RANGE) {
+                    ctx.fillStyle = '#10b981';
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 2;
+                    const bx = this.x - 40, by = this.y - h - 36, bw = 80, bh = 24;
+                    ctx.beginPath();
+                    ctx.roundRect(bx, by, bw, bh, 8);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 11px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('💬 [E] 話す', this.x, this.y - h - 24);
+                }
+                ctx.restore();
+            }
+        }
+
+        const mapNpcs = [];
+        function initMapNpcs() {
+            mapNpcs.length = 0;
+            Object.entries(MAP_AREAS).forEach(([areaKey, area]) => {
+                area.npcs.forEach((def) => mapNpcs.push(new MapNpc(def, areaKey)));
+            });
+        }
+        initMapNpcs();
+
+        // -------------------------------------------------------------
+        // PROGRAM 5: 敵クラスは enemies.js（Enemy を継承した種類別クラス）
+        // -------------------------------------------------------------
+
+        // -------------------------------------------------------------
+        // PROGRAM 4 & 9: VFX ENGINE & FLOATING COMBAT TEXT
+        // -------------------------------------------------------------
+        class VFXManager {
+            constructor() {
+                this.slashes = [];
+                this.particles = [];
+                this.damageTexts = [];
+            }
+
+            addSlash(x, y, facing, step) {
+                this.slashes.push({ x, y, facing, step, life: 10, maxLife: 10 });
+            }
+
+            addNova(x, y) {
+                for (let i = 0; i < 24; i++) {
+                    const angle = (Math.PI * 2 / 24) * i;
+                    this.particles.push({
+                        x, y,
+                        vx: Math.cos(angle) * 8,
+                        vy: Math.sin(angle) * 8,
+                        color: '#a855f7',
+                        size: 6,
+                        life: 20
+                    });
+                }
+            }
+
+            addExplosion(x, y) {
+                for (let i = 0; i < 16; i++) {
+                    this.particles.push({
+                        x, y,
+                        vx: (Math.random() - 0.5) * 10,
+                        vy: (Math.random() - 0.5) * 10,
+                        color: '#f97316',
+                        size: 8,
+                        life: 25
+                    });
+                }
+            }
+
+            addDamageText(x, y, text, color) {
+                this.damageTexts.push({ x, y, text, color, alpha: 1, vy: -1.5 });
+            }
+
+            update() {
+                this.slashes.forEach(s => s.life--);
+                this.slashes = this.slashes.filter(s => s.life > 0);
+
+                this.particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.life--;
+                });
+                this.particles = this.particles.filter(p => p.life > 0);
+
+                this.damageTexts.forEach(dt => {
+                    dt.y += dt.vy;
+                    dt.alpha -= 0.03;
+                });
+                this.damageTexts = this.damageTexts.filter(dt => dt.alpha > 0);
+            }
+
+            draw(ctx) {
+                // 斬撃描画
+                this.slashes.forEach(s => {
+                    ctx.save();
+                    ctx.strokeStyle = '#f472b6';
+                    ctx.lineWidth = 6;
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, 35, 0, Math.PI * 1.5);
+                    ctx.stroke();
+                    ctx.restore();
+                });
+
+                // パーティクル描画
+                this.particles.forEach(p => {
+                    ctx.save();
+                    ctx.fillStyle = p.color;
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                });
+
+                // ダメージテキスト描画
+                this.damageTexts.forEach(dt => {
+                    ctx.save();
+                    ctx.globalAlpha = dt.alpha;
+                    ctx.fillStyle = dt.color;
+                    ctx.font = '900 18px DotGothic16, sans-serif';
+                    ctx.fillText(dt.text, dt.x, dt.y);
+                    ctx.restore();
+                });
+            }
+        }
+
+        // -------------------------------------------------------------
+        // PROGRAM 8: DYNAMIC CAMERA & SMOOTH VIEWPORT MANAGER
+        // -------------------------------------------------------------
+        class DynamicCamera {
+            constructor() {
+                this.x = 0;
+                this.y = 0;
+                this.shakeAmount = 0;
+                this.zoom = 1;
+                this.zoomTarget = 1;
+                this.zoomHold = 0;
+            }
+
+            zoomTo(amount, hold) {
+                this.zoomTarget = amount;
+                this.zoomHold = hold || 12;
+            }
+
+            follow(target) {
+                this.zoom += (this.zoomTarget - this.zoom) * 0.18;
+                if (this.zoomHold > 0) {
+                    this.zoomHold--;
+                    if (this.zoomHold <= 0) this.zoomTarget = 1;
+                }
+
+                const view = cssView();
+                const viewW = view.w / this.zoom;
+                const viewH = view.h / this.zoom;
+                const targetX = target.x - viewW / 2;
+                const targetY = target.y - viewH / 2;
+
+                this.x += (targetX - this.x) * 0.1;
+                this.y += (targetY - this.y) * 0.1;
+
+                if (this.shakeAmount > 0) {
+                    this.x += (Math.random() - 0.5) * this.shakeAmount;
+                    this.y += (Math.random() - 0.5) * this.shakeAmount;
+                    this.shakeAmount *= 0.88;
+                }
+            }
+
+            shake(amount) {
+                this.shakeAmount = Math.max(this.shakeAmount, amount);
+            }
+
+            apply(ctx) {
+                const dpr = canvasDpr();
+                ctx.setTransform(this.zoom * dpr, 0, 0, this.zoom * dpr, -this.x * this.zoom * dpr, -this.y * this.zoom * dpr);
+                ctx.imageSmoothingEnabled = false;
+            }
+        }
+
+        // インスタンス化
+        const player = new Player();
+        const camera = new DynamicCamera();
+        const vfxManager = new VFXManager();
+
+        // 敵のスポーン設定
+        const enemies = [
+            EnemyKit.spawn('delinquent', 600, 700, 'SCHOOL'),
+            EnemyKit.spawn('delinquent', 1000, 800, 'SCHOOL'),
+            EnemyKit.spawn('chicken', 240, 560, 'SCHOOL'),
+            EnemyKit.spawn('chicken', 1320, 640, 'SCHOOL'),
+            EnemyKit.spawn('rabbit', 260, 940, 'SCHOOL'),
+            EnemyKit.spawn('rabbit', 1280, 900, 'SCHOOL'),
+            EnemyKit.spawn('stray_dog', 260, 680, 'ROAD'),
+            EnemyKit.spawn('stray_dog', 1340, 680, 'ROAD'),
+            EnemyKit.spawn('bike_kid', 520, 500, 'ROAD'),
+            EnemyKit.spawn('bike_kid', 1080, 720, 'ROAD'),
+            EnemyKit.spawn('bike_kid', 800, 620, 'ROAD'),
+            EnemyKit.spawn('delinquent', 800, 600, 'SHOPPING'),
+            EnemyKit.spawn('boss', 800, 860, 'PARK'),
+            EnemyKit.spawn('kinjiro', 400, 380, 'PARK'),
+            EnemyKit.spawn('kinjiro', 1200, 380, 'PARK'),
+            EnemyKit.spawn('kinjiro', 360, 980, 'PARK'),
+            EnemyKit.spawn('kinjiro', 1280, 980, 'PARK')
+        ];
+
+        breakables.seed('SCHOOL', [
+            { x: 520, y: 620, w: 32, h: 28, type: 'pot', hp: 20 },
+            { x: 1080, y: 640, w: 32, h: 28, type: 'pot', hp: 20 },
+            { x: 300, y: 860, w: 40, h: 28, type: 'crate', hp: 24 }
+        ]);
+        breakables.seed('ROAD', [
+            { x: 90, y: 500, w: 36, h: 30, type: 'sign', hp: 22 },
+            { x: 1480, y: 620, w: 36, h: 30, type: 'sign', hp: 22 },
+            { x: 200, y: 780, w: 32, h: 28, type: 'pot', hp: 18 }
+        ]);
+        breakables.seed('SHOPPING', [
+            { x: 180, y: 560, w: 32, h: 28, type: 'pot', hp: 18 },
+            { x: 700, y: 540, w: 40, h: 28, type: 'crate', hp: 26 },
+            { x: 1180, y: 560, w: 32, h: 28, type: 'pot', hp: 18 }
+        ]);
+        breakables.seed('PARK', [
+            { x: 420, y: 380, w: 32, h: 28, type: 'pot', hp: 22 },
+            { x: 1180, y: 380, w: 32, h: 28, type: 'pot', hp: 22 },
+            { x: 760, y: 860, w: 40, h: 28, type: 'crate', hp: 30 }
+        ]);
+
+        function onPlayerProjectileHit(enemy, proj) {
+            enemy.takeDamage(proj.damage, player.x, player.y, { poise: proj.poise, pull: proj.pull });
+            vfxManager.addSlash(enemy.x, enemy.y, player.facing, 2);
+            breakables.hitAt(proj.x, proj.y, 24, proj.damage, (d) => {
+                vfxManager.addExplosion(d.x, d.y);
+                GameState.money += 5;
+                comboRank.registerHit(1);
+            });
+        }
+
+        function onEnemyProjectileHit(proj) {
+            player.takeDamage(Math.max(8, (proj.damage || 12) - 2));
+            proj.life = 0;
+        }
+
+        // -------------------------------------------------------------
+        // PROGRAM 6: QUEST & INTERACTION SYSTEM
+        // -------------------------------------------------------------
+        function checkPortalsAndInteractions() {
+            const currentMap = MAP_AREAS[GameState.currentArea];
+
+            // ポータル接触チェック
+            if (GameState.portalLock > 0) GameState.portalLock--;
+            currentMap.portals.forEach(portal => {
+                if (GameState.portalLock > 0) return;
+                if (player.x > portal.x && player.x < portal.x + portal.w &&
+                    player.y > portal.y && player.y < portal.y + portal.h) {
+                    GameState.currentArea = portal.target;
+                    player.x = portal.spawnX;
+                    player.y = portal.spawnY;
+                    GameState.portalLock = 24;
+                    showNotification(`${MAP_AREAS[portal.target].name} に移動しました`);
+                    updateHUD();
+                }
+            });
+
+            if (keys['KeyE'] || keys['InteractTrigger']) {
+                if (GameState.currentArea === 'DAGASHI') {
+                    const kuji = currentMap.decorations.find((d) => d.type === 'kuji');
+                    if (kuji && Math.hypot(player.x - (kuji.x + kuji.w / 2), player.y - (kuji.y + kuji.h / 2)) < 140) {
+                        keys['KeyE'] = false;
+                        keys['InteractTrigger'] = false;
+                        playLottery();
+                    }
+                }
+                if (GameState.currentArea === 'ARCADE') {
+                    const cab = currentMap.decorations.find((d) => d.type === 'invader_cab');
+                    if (cab && Math.hypot(player.x - (cab.x + cab.w / 2), player.y - (cab.y + cab.h / 2)) < 150) {
+                        keys['KeyE'] = false;
+                        keys['InteractTrigger'] = false;
+                        startInvaders();
+                    }
+                }
+            }
+
+            // NPC近接チェック (会話トリガー)
+            mapNpcs.forEach((mob) => {
+                if (mob.area !== GameState.currentArea) return;
+                const npc = mob.def;
+                const dist = Math.hypot(player.x - mob.x, player.y - mob.y);
+                if (dist < CHAR_TALK_RANGE && (keys['KeyE'] || keys['InteractTrigger'])) {
+                    keys['KeyE'] = false;
+                    keys['InteractTrigger'] = false;
+                    if (npc.shopItem) {
+                        if (GameState.money >= npc.price) {
+                            GameState.money -= npc.price;
+                            const item = GameState.inventory.find(i => i.id === npc.shopItem);
+                            if (item) item.count++;
+                            else GameState.inventory.push({ id: 'yakisoba_pan', name: '焼きそばパン', count: 1, icon: '🥖', hpRestore: 40, desc: 'HPを40回復。' });
+                            showNotification("焼きそばパンを購入しました！");
+                            updateHUD();
+                        } else {
+                            showNotification("お金が足りないよ！");
+                        }
+                    } else {
+                        const dialogTexts = typeof npc.dialog === 'function' ? npc.dialog() : npc.dialog;
+                        showDialog(npc.name, dialogTexts);
+                    }
+                }
+            });
+        }
+
+        function grantItem(id) {
+            const catalog = {
+                yakisoba_pan: { id: 'yakisoba_pan', name: '焼きそばパン', icon: '🥖', hpRestore: 40, desc: 'HPを40回復する。' },
+                pocari: { id: 'pocari', name: 'スポーツドリンク', icon: '🥤', hpRestore: 80, desc: 'HPを80回復する。' }
+            };
+            const def = catalog[id];
+            if (!def) return;
+            const item = GameState.inventory.find((i) => i.id === id);
+            if (item) item.count++;
+            else GameState.inventory.push({ ...def, count: 1 });
+        }
+
+        function playLottery() {
+            if (GameState.money < ShopKit.LOTTERY_COST) {
+                showNotification('20円必要だよ！');
+                return;
+            }
+            GameState.money -= ShopKit.LOTTERY_COST;
+            const prize = ShopKit.pickLottery();
+            if (prize.give && prize.give.hp) {
+                player.hp = Math.min(player.maxHp, player.hp + prize.give.hp);
+                vfxManager.addDamageText(player.x, player.y - 30, `+${prize.give.hp} HP`, '#4ade80');
+            }
+            if (prize.give && prize.give.item) grantItem(prize.give.item);
+            if (prize.give && prize.give.money) GameState.money += prize.give.money;
+            audio.playLevelUp();
+            updateHUD();
+            showDialog('くじ引き', [prize.title, prize.text]);
+        }
+
+        function startInvaders() {
+            GameState.minigame = 'invaders';
+            invaderGame.start();
+            showNotification('インベーダー始動！ Jで発射、Eで終了');
+        }
+
+        function finishInvaders() {
+            const score = invaderGame.quit();
+            GameState.minigame = null;
+            const payout = Math.floor(score / 5);
+            if (payout > 0) {
+                GameState.money += payout;
+                showNotification(`スコア${score}！ ${payout}円ゲット`);
+            } else {
+                showNotification('また挑戦してくれよな');
+            }
+            updateHUD();
+        }
+
+        function showDialog(speakerName, texts, onFinish = null) {
+            GameState.dialogActive = true;
+            GameState.dialogQueue = [...texts];
+            GameState.dialogCallback = onFinish;
+
+            document.getElementById('dialog-speaker-name').innerText = speakerName;
+            document.getElementById('dialog-text').innerText = GameState.dialogQueue.shift();
+            document.getElementById('dialog-box').classList.remove('hidden');
+        }
+
+        function advanceDialog() {
+            if (GameState.dialogQueue.length > 0) {
+                document.getElementById('dialog-text').innerText = GameState.dialogQueue.shift();
+            } else {
+                GameState.dialogActive = false;
+                document.getElementById('dialog-box').classList.add('hidden');
+                if (GameState.dialogCallback) GameState.dialogCallback();
+            }
+        }
+
+        document.getElementById('dialog-next-btn').addEventListener('click', advanceDialog);
+
+        // -------------------------------------------------------------
+        // PROGRAM 7 & 10: HUD, INVENTORY & NOTIFICATION SYSTEM
+        // -------------------------------------------------------------
+        function updateHUD() {
+            document.getElementById('hp-text').innerText = `${player.hp} / ${player.maxHp}`;
+            document.getElementById('hp-bar').style.width = `${(player.hp / player.maxHp) * 100}%`;
+
+            document.getElementById('exp-text').innerText = `${player.exp} / ${player.maxExp}`;
+            document.getElementById('exp-bar').style.width = `${(player.exp / player.maxExp) * 100}%`;
+
+            document.getElementById('player-level').innerText = `Lv.${player.level}`;
+            document.getElementById('money-text').innerText = GameState.money;
+            document.getElementById('location-name').innerText = MAP_AREAS[GameState.currentArea].name;
+            document.getElementById('sp-text').innerText = `${player.sp} / ${player.maxSp}`;
+            document.getElementById('sp-bar').style.width = `${(player.sp / player.maxSp) * 100}%`;
+            document.getElementById('weapon-text').innerText = GameState.weapon === 'flute' ? 'フルート' : 'ヨーヨー';
+
+            const hud = document.getElementById('combo-hud');
+            if (comboRank.count > 0) {
+                hud.style.opacity = '1';
+                document.getElementById('combo-count').innerText = `${comboRank.count} HIT`;
+                const rank = comboRank.rank;
+                const rankEl = document.getElementById('combo-rank');
+                rankEl.innerText = `RANK ${rank.name}`;
+                rankEl.style.color = rank.color;
+                const call = document.getElementById('combo-callout');
+                if (comboRank.justFlash > 0) call.innerText = 'JUST DODGE';
+                else if (comboRank.breakFlash > 0) call.innerText = 'BREAK';
+                else call.innerText = '';
+            } else {
+                hud.style.opacity = '0';
+            }
+
+            // クエストトラッカー更新
+            const questTexts = {
+                SCHOOL: "学校のグラウンドで練習し、南の校門から道路へ出よう。",
+                ROAD: "道路を東に進み、商店街へ向かおう。",
+                SHOPPING: "店の入口から中へ。南の道は公園だ。",
+                BAKERY: "焼きそばパンを買って体力を整えよう。南が出口。",
+                DAGASHI: "20円でくじ引き。南が出口。",
+                ARCADE: "中央の筐体でインベーダー。南が出口。",
+                PARK: "動く金次郎銅像を倒し、暗黒校長を討て！"
+            };
+            document.getElementById('quest-tracker-text').innerText = questTexts[GameState.currentArea] || "";
+
+            // ミニマップ描画
+            renderMinimap();
+        }
+
+        function renderMinimap() {
+            miniCtx.fillStyle = '#0f172a';
+            miniCtx.fillRect(0, 0, minimapCanvas.width, minimapCanvas.height);
+
+            const scaleX = minimapCanvas.width / WORLD_WIDTH;
+            const scaleY = minimapCanvas.height / WORLD_HEIGHT;
+
+            // プレイヤー位置ドット
+            miniCtx.fillStyle = '#ec4899';
+            miniCtx.beginPath();
+            miniCtx.arc(player.x * scaleX, player.y * scaleY, 3, 0, Math.PI * 2);
+            miniCtx.fill();
+        }
+
+        function showNotification(text) {
+            const toast = document.getElementById('notification-toast');
+            document.getElementById('toast-text').innerText = text;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => toast.classList.add('opacity-0'), 2500);
+        }
+
+        function openInventory() {
+            const listContainer = document.getElementById('inventory-list');
+            if (!listContainer) return;
+            listContainer.innerHTML = '';
+
+            GameState.inventory.forEach(item => {
+                const itemEl = document.createElement('div');
+                itemEl.className = 'bg-slate-900 p-3 rounded-2xl border border-slate-700 flex justify-between items-center';
+                itemEl.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="text-2xl">${item.icon}</span>
+                        <div>
+                            <div class="text-xs font-bold text-slate-200">${item.name} x${item.count}</div>
+                            <div class="text-[10px] text-slate-400">${item.desc}</div>
+                        </div>
+                    </div>
+                    <button class="use-btn bg-pink-500 hover:bg-pink-400 text-white font-bold text-xs px-3 py-1.5 rounded-xl">使用</button>
+                `;
+                itemEl.querySelector('.use-btn').addEventListener('click', () => {
+                    if (item.count > 0) {
+                        item.count--;
+                        player.hp = Math.min(player.maxHp, player.hp + item.hpRestore);
+                        vfxManager.addDamageText(player.x, player.y - 30, `+${item.hpRestore} HP`, '#4ade80');
+                        showNotification(`${item.name} を使ってHPを回復した！`);
+                        updateHUD();
+                        document.getElementById('inventory-modal').classList.add('hidden');
+                    }
+                });
+                listContainer.appendChild(itemEl);
+            });
+
+            document.getElementById('inventory-modal').classList.remove('hidden');
+        }
+
+        document.getElementById('close-inventory-btn').addEventListener('click', () => {
+            document.getElementById('inventory-modal').classList.add('hidden');
+        });
+
+        // -------------------------------------------------------------
+        // MAIN RENDER LOOP & INPUT HANDLING
+        // -------------------------------------------------------------
+        const keys = {};
+
+        window.addEventListener('keydown', e => {
+            keys[e.code] = true;
+
+            if (e.code === 'KeyE') {
+                keys['InteractTrigger'] = true;
+                if (!GameState.minigame) checkPortalsAndInteractions();
+            }
+            if (GameState.minigame) return;
+            if (e.code === 'KeyJ' || e.code === 'Space' || e.code === 'KeyZ') player.attack();
+            if (e.code === 'KeyK' || e.code === 'ShiftLeft' || e.code === 'KeyX') player.dash();
+            if (e.code === 'KeyL' || e.code === 'KeyC') player.useSkill();
+            if (e.code === 'KeyQ') player.cycleWeapon();
+        });
+
+        window.addEventListener('keyup', e => {
+            keys[e.code] = false;
+        });
+
+        let lastTap = 0;
+        document.addEventListener('touchstart', (e) => {
+            const now = Date.now();
+            if (now - lastTap < 300) e.preventDefault();
+            lastTap = now;
+        }, { passive: false });
+        let lastTouchEnd = 0;
+        document.addEventListener('touchend', (e) => {
+            const now = Date.now();
+            if (now - lastTouchEnd <= 300) e.preventDefault();
+            lastTouchEnd = now;
+        }, { passive: false });
+        document.addEventListener('dblclick', (e) => e.preventDefault());
+        document.addEventListener('contextmenu', (e) => e.preventDefault());
+        document.addEventListener('touchmove', (e) => {
+            if (e.target.closest('[data-scrollable]')) return;
+            e.preventDefault();
+        }, { passive: false });
+        document.addEventListener('pointerdown', () => audio.init(), { once: true });
+        document.addEventListener('keydown', () => audio.init(), { once: true });
+
+        function bindTap(el, handler) {
+            if (!el) return;
+            const fire = (e) => {
+                e.preventDefault();
+                el.classList.add('is-pressed');
+                if (navigator.vibrate) navigator.vibrate(15);
+                handler(e);
+            };
+            const release = () => el.classList.remove('is-pressed');
+            el.addEventListener('pointerdown', fire);
+            el.addEventListener('pointerup', release);
+            el.addEventListener('pointercancel', release);
+            el.addEventListener('pointerleave', release);
+        }
+
+        bindTap(document.getElementById('btn-interact'), () => {
+            keys['InteractTrigger'] = true;
+            if (GameState.minigame === 'invaders') return;
+            checkPortalsAndInteractions();
+        });
+        bindTap(document.getElementById('btn-attack'), () => {
+            if (GameState.minigame === 'invaders') invaderGame.shoot();
+            else player.attack();
+        });
+        bindTap(document.getElementById('btn-dash'), () => { if (!GameState.minigame) player.dash(); });
+        bindTap(document.getElementById('btn-skill'), () => { if (!GameState.minigame) player.useSkill(); });
+        bindTap(document.getElementById('btn-weapon'), () => { if (!GameState.minigame) player.cycleWeapon(); });
+        bindTap(document.getElementById('btn-inventory'), () => { if (!GameState.minigame) openInventory(); });
+
+        const bindDpad = (id, key) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            const down = (e) => {
+                e.preventDefault();
+                btn.setPointerCapture(e.pointerId);
+                btn.classList.add('is-pressed');
+                keys[key] = true;
+                if (navigator.vibrate) navigator.vibrate(12);
+            };
+            const up = () => {
+                btn.classList.remove('is-pressed');
+                keys[key] = false;
+            };
+            btn.addEventListener('pointerdown', down);
+            btn.addEventListener('pointerup', up);
+            btn.addEventListener('pointercancel', up);
+        };
+        bindDpad('dpad-up', 'ArrowUp');
+        bindDpad('dpad-down', 'ArrowDown');
+        bindDpad('dpad-left', 'ArrowLeft');
+        bindDpad('dpad-right', 'ArrowRight');
+
+        function drawShop3DBody(ctx, dec) {
+            const { x, y, w, h, color } = dec;
+            const depth = 24;
+            const wallTop = y + depth;
+
+            ctx.fillStyle = '#334155';
+            ctx.beginPath();
+            ctx.moveTo(x, wallTop);
+            ctx.lineTo(x + depth, y);
+            ctx.lineTo(x + w + depth, y);
+            ctx.lineTo(x + w, wallTop);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#475569';
+            ctx.beginPath();
+            ctx.moveTo(x + w, wallTop);
+            ctx.lineTo(x + w + depth, y);
+            ctx.lineTo(x + w + depth, y + h);
+            ctx.lineTo(x + w, wallTop + h - depth);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = color;
+            ctx.fillRect(x, wallTop, w, h - depth);
+
+            ctx.fillStyle = 'rgba(0,0,0,0.18)';
+            ctx.fillRect(x + 10, wallTop + 56, w - 20, h - depth - 72);
+
+            ctx.fillStyle = '#fef3c7';
+            ctx.fillRect(x + w / 2 - 34, wallTop + h - depth - 68, 68, 58);
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(x + w / 2 - 28, wallTop + h - depth - 62, 56, 46);
+
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(x + 16, wallTop + 14, w - 32, 34);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 16px M PLUS Rounded 1c, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(dec.name, x + w / 2, wallTop + 31);
+
+            ctx.fillStyle = '#64748b';
+            ctx.fillRect(x, wallTop + h - depth, w, 10);
+        }
+
+        function drawShop3DFront(ctx, dec) {
+            const { x, y, w, color } = dec;
+            const awning = dec.awning || '#dc2626';
+            const depth = 24;
+            const wallTop = y + depth;
+            const awH = 28;
+
+            ctx.fillStyle = awning;
+            ctx.beginPath();
+            ctx.moveTo(x - 10, wallTop + 46);
+            ctx.lineTo(x + w + 10, wallTop + 46);
+            ctx.lineTo(x + w + 18, wallTop + 46 + awH);
+            ctx.lineTo(x - 18, wallTop + 46 + awH);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = 'rgba(255,255,255,0.35)';
+            for (let stripe = x - 8; stripe < x + w + 8; stripe += 24) {
+                ctx.fillRect(stripe, wallTop + 48, 12, awH - 4);
+            }
+
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + w / 2 - 30, wallTop + 52, 60, 36);
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(x + w / 2 - 24, wallTop + 58, 16, 24);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(x + w / 2 - 2, wallTop + 58, 16, 24);
+            ctx.fillStyle = '#2563eb';
+            ctx.fillRect(x + w / 2 + 8, wallTop + 58, 16, 24);
+        }
+
+        function drawRoadGrass(ctx, dec) {
+            ctx.fillStyle = '#35583f';
+            ctx.fillRect(dec.x, dec.y, dec.w, dec.h);
+            ctx.fillStyle = '#3d6648';
+            for (let ty = dec.y; ty < dec.y + dec.h; ty += 28) {
+                for (let tx = dec.x; tx < dec.x + dec.w; tx += 28) {
+                    if (((tx * 7 + ty * 3) / 28 | 0) % 2 === 0) {
+                        ctx.fillRect(tx, ty, 14, 14);
+                    }
+                }
+            }
+        }
+
+        function drawRoadShoulder(ctx, dec) {
+            const isLeft = dec.side !== 'right';
+            ctx.fillStyle = '#b8bec8';
+            ctx.fillRect(dec.x, dec.y, dec.w, dec.h);
+
+            ctx.fillStyle = '#a8aeb8';
+            for (let ty = dec.y; ty < dec.y + dec.h; ty += 24) {
+                for (let tx = dec.x; tx < dec.x + dec.w; tx += 24) {
+                    if (((tx + ty) / 24 | 0) % 2 === 0) ctx.fillRect(tx, ty, 24, 24);
+                }
+            }
+
+            const curbX = isLeft ? dec.x + dec.w - 10 : dec.x;
+            ctx.fillStyle = '#64748b';
+            ctx.fillRect(curbX, dec.y, 10, dec.h);
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(isLeft ? curbX + 2 : curbX, dec.y, 4, dec.h);
+
+            const tactX = isLeft ? dec.x + dec.w - 72 : dec.x + 12;
+            const tactY = 470;
+            const tactH = 96;
+            ctx.fillStyle = '#fbbf24';
+            for (let ty = tactY; ty < tactY + tactH; ty += 12) {
+                for (let tx = tactX; tx < tactX + 56; tx += 12) {
+                    ctx.fillRect(tx, ty, 8, 8);
+                }
+            }
+        }
+
+        function drawRoadCarriageway(ctx, dec) {
+            ctx.fillStyle = '#3d4654';
+            ctx.fillRect(dec.x, dec.y, dec.w, dec.h);
+
+            ctx.fillStyle = '#454f5e';
+            for (let ty = dec.y + 6; ty < dec.y + dec.h; ty += 52) {
+                ctx.fillRect(dec.x, ty, dec.w, 2);
+            }
+
+            ctx.fillStyle = '#f8fafc';
+            ctx.fillRect(dec.x + 10, dec.y, 5, dec.h);
+            ctx.fillRect(dec.x + dec.w - 15, dec.y, 5, dec.h);
+
+            const centerX = dec.x + dec.w / 2 - 2;
+            ctx.fillStyle = '#fbbf24';
+            for (let dy = dec.y + 12; dy < dec.y + dec.h; dy += 40) {
+                ctx.fillRect(centerX, dy, 4, 22);
+            }
+        }
+
+        function drawCrosswalk(ctx, dec) {
+            ctx.fillStyle = '#ffffff';
+            const stripeH = 12;
+            const gap = 16;
+            for (let sy = dec.y + 10; sy < dec.y + dec.h - 10; sy += stripeH + gap) {
+                ctx.fillRect(dec.x + 20, sy, dec.w - 40, stripeH);
+            }
+
+            ctx.fillStyle = 'rgba(248,250,252,0.55)';
+            ctx.fillRect(dec.x + 20, dec.y + 4, dec.w - 40, 4);
+            ctx.fillRect(dec.x + 20, dec.y + dec.h - 8, dec.w - 40, 4);
+        }
+
+        function drawTrafficLight(ctx, dec) {
+            const poleX = dec.x;
+            ctx.fillStyle = '#64748b';
+            ctx.fillRect(poleX, dec.y, 8, 58);
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(poleX - 10, dec.y - 42, 28, 44);
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc(poleX + 4, dec.y - 30, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.arc(poleX + 4, dec.y - 16, 5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#22c55e';
+            ctx.beginPath();
+            ctx.arc(poleX + 4, dec.y - 4, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (dec.side === 'left') {
+                ctx.fillStyle = '#fde68a';
+                ctx.font = 'bold 11px DotGothic16, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('止', dec.x - 18, dec.y - 18);
+            }
+        }
+
+        function drawShoppingStreet(ctx, dec) {
+            ctx.fillStyle = '#57534e';
+            ctx.fillRect(dec.x, dec.y, dec.w, dec.h);
+            ctx.fillStyle = '#78716c';
+            for (let ty = dec.y; ty < dec.y + dec.h; ty += 32) {
+                for (let tx = dec.x; tx < dec.x + dec.w; tx += 32) {
+                    if (((tx + ty) / 32) % 2 === 0) ctx.fillRect(tx, ty, 32, 32);
+                }
+            }
+            ctx.strokeStyle = '#a8a29e';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([18, 14]);
+            ctx.beginPath();
+            ctx.moveTo(dec.x + 80, dec.y + dec.h / 2);
+            ctx.lineTo(dec.x + dec.w - 80, dec.y + dec.h / 2);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function drawLantern(ctx, dec) {
+            ctx.fillStyle = '#44403c';
+            ctx.fillRect(dec.x - 3, dec.y - 36, 6, 36);
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.ellipse(dec.x, dec.y - 40, 14, 18, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#fde68a';
+            ctx.beginPath();
+            ctx.ellipse(dec.x, dec.y - 40, 8, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function drawSandbox(ctx, dec) {
+            ctx.fillStyle = '#d6b36a';
+            ctx.fillRect(dec.x, dec.y, dec.w, dec.h);
+            ctx.fillStyle = '#c9a24e';
+            for (let ty = dec.y; ty < dec.y + dec.h; ty += 20) {
+                for (let tx = dec.x; tx < dec.x + dec.w; tx += 20) {
+                    if (((tx + ty) / 20 | 0) % 2 === 0) ctx.fillRect(tx, ty, 20, 20);
+                }
+            }
+            ctx.strokeStyle = '#92400e';
+            ctx.lineWidth = 6;
+            ctx.strokeRect(dec.x, dec.y, dec.w, dec.h);
+        }
+
+        function drawSwing(ctx, dec) {
+            const t = performance.now() / 420;
+            const ang = Math.sin(t) * 0.5;
+            ctx.fillStyle = '#64748b';
+            ctx.fillRect(dec.x - 68, dec.y - 130, 10, 130);
+            ctx.fillRect(dec.x + 58, dec.y - 130, 10, 130);
+            ctx.fillRect(dec.x - 72, dec.y - 138, 144, 12);
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillRect(dec.x - 72, dec.y - 8, 16, 12);
+            ctx.fillRect(dec.x + 56, dec.y - 8, 16, 12);
+            for (const ox of [-28, 28]) {
+                ctx.save();
+                ctx.translate(dec.x + ox, dec.y - 132);
+                ctx.rotate(ang);
+                ctx.strokeStyle = '#cbd5e1';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.lineTo(0, 88);
+                ctx.stroke();
+                ctx.fillStyle = '#b45309';
+                ctx.fillRect(-12, 84, 24, 8);
+                ctx.restore();
+            }
+        }
+
+        function drawSeesaw(ctx, dec) {
+            const tilt = Math.sin(performance.now() / 680) * 0.24;
+            ctx.fillStyle = '#57534e';
+            ctx.beginPath();
+            ctx.moveTo(dec.x - 16, dec.y + 8);
+            ctx.lineTo(dec.x + 16, dec.y + 8);
+            ctx.lineTo(dec.x, dec.y - 28);
+            ctx.closePath();
+            ctx.fill();
+            ctx.save();
+            ctx.translate(dec.x, dec.y - 22);
+            ctx.rotate(tilt);
+            ctx.fillStyle = '#f59e0b';
+            ctx.fillRect(-90, -6, 180, 12);
+            ctx.fillStyle = '#dc2626';
+            ctx.fillRect(-86, -14, 22, 10);
+            ctx.fillRect(64, -14, 22, 10);
+            ctx.restore();
+        }
+
+        function drawSlide(ctx, dec) {
+            ctx.fillStyle = '#64748b';
+            ctx.fillRect(dec.x, dec.y - 110, 14, 110);
+            ctx.fillRect(dec.x + 46, dec.y - 110, 14, 110);
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillRect(dec.x - 4, dec.y - 118, 68, 12);
+            ctx.fillStyle = '#e2e8f0';
+            for (let i = 0; i < 5; i++) {
+                ctx.fillRect(dec.x + 16, dec.y - 18 - i * 18, 28, 8);
+            }
+            ctx.fillStyle = '#38bdf8';
+            ctx.beginPath();
+            ctx.moveTo(dec.x + 58, dec.y - 110);
+            ctx.lineTo(dec.x + 168, dec.y - 8);
+            ctx.lineTo(dec.x + 148, dec.y + 6);
+            ctx.lineTo(dec.x + 58, dec.y - 88);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillStyle = '#7dd3fc';
+            ctx.fillRect(dec.x + 148, dec.y - 4, 28, 10);
+        }
+
+        function renderMapGround(ctx, areaKey) {
+            const area = MAP_AREAS[areaKey];
+            ctx.fillStyle = area.bgColor;
+            ctx.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+            if (areaKey === 'SCHOOL' && SchoolMap && SchoolMap.drawYard) {
+                SchoolMap.drawYard(ctx, WORLD_WIDTH, WORLD_HEIGHT);
+            }
+            if (ShopKit && ShopKit.drawInterior) ShopKit.drawInterior(ctx, areaKey, WORLD_WIDTH, WORLD_HEIGHT);
+
+            area.decorations.forEach((dec) => {
+                if (SchoolMap && SchoolMap.isGround(dec.type)) SchoolMap.draw(ctx, dec);
+                else if (dec.type === 'shopping_street') drawShoppingStreet(ctx, dec);
+                else if (dec.type === 'road_grass') drawRoadGrass(ctx, dec);
+                else if (dec.type === 'road_shoulder') drawRoadShoulder(ctx, dec);
+                else if (dec.type === 'road_carriageway') drawRoadCarriageway(ctx, dec);
+                else if (dec.type === 'crosswalk') drawCrosswalk(ctx, dec);
+                else if (dec.type === 'sandbox') drawSandbox(ctx, dec);
+                else if (dec.type === 'asphalt') {
+                    ctx.fillStyle = '#1e293b';
+                    ctx.fillRect(dec.x, dec.y, dec.w, dec.h);
+                }
+            });
+        }
+
+        function renderMapStructuresBack(ctx, areaKey) {
+            MAP_AREAS[areaKey].decorations.forEach((dec) => {
+                ctx.save();
+                if (SchoolMap && SchoolMap.isProp(dec.type)) SchoolMap.draw(ctx, dec);
+                else if (dec.type === 'shop') drawShop3DBody(ctx, dec);
+                else if (dec.type === 'tree' || dec.type === 'cherry_tree') {
+                    ctx.fillStyle = '#78350f';
+                    ctx.fillRect(dec.x - 6, dec.y - 4, 12, 22);
+                    ctx.fillStyle = dec.type === 'cherry_tree' ? '#f472b6' : '#15803d';
+                    ctx.beginPath();
+                    ctx.arc(dec.x, dec.y - 18, 40, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = dec.type === 'cherry_tree' ? '#fbcfe8' : '#22c55e';
+                    ctx.beginPath();
+                    ctx.arc(dec.x - 14, dec.y - 26, 18, 0, Math.PI * 2);
+                    ctx.arc(dec.x + 16, dec.y - 22, 16, 0, Math.PI * 2);
+                    ctx.fill();
+                } else if (dec.type === 'fountain') {
+                    ctx.fillStyle = '#64748b';
+                    ctx.beginPath();
+                    ctx.arc(dec.x, dec.y, dec.r + 8, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.beginPath();
+                    ctx.arc(dec.x, dec.y, dec.r, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#ffffff';
+                    ctx.lineWidth = 6;
+                    ctx.stroke();
+                } else if (dec.type === 'traffic_light') {
+                    drawTrafficLight(ctx, dec);
+                } else if (dec.type === 'bench') {
+                    ctx.fillStyle = '#92400e';
+                    ctx.fillRect(dec.x - 40, dec.y, 80, 12);
+                    ctx.fillRect(dec.x - 36, dec.y + 12, 8, 16);
+                    ctx.fillRect(dec.x + 28, dec.y + 12, 8, 16);
+                } else if (dec.type === 'lantern') {
+                    drawLantern(ctx, dec);
+                } else if (dec.type === 'swing') {
+                    drawSwing(ctx, dec);
+                } else if (dec.type === 'seesaw') {
+                    drawSeesaw(ctx, dec);
+                } else if (dec.type === 'slide') {
+                    drawSlide(ctx, dec);
+                }
+                ctx.restore();
+            });
+        }
+
+        function renderMapStructuresFront(ctx, areaKey) {
+            MAP_AREAS[areaKey].decorations.forEach((dec) => {
+                if (dec.type === 'shop') {
+                    ctx.save();
+                    drawShop3DFront(ctx, dec);
+                    if (dec.enter) {
+                        ctx.fillStyle = '#022c22';
+                        ctx.fillRect(dec.x + dec.w / 2 - 36, dec.y + dec.h + 8, 72, 18);
+                        ctx.fillStyle = '#6ee7b7';
+                        ctx.font = 'bold 11px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.fillText('入口', dec.x + dec.w / 2, dec.y + dec.h + 21);
+                    }
+                    ctx.restore();
+                }
+            });
+        }
+
+        function renderMapDecorations(ctx, areaKey) {
+            renderMapGround(ctx, areaKey);
+            renderMapStructuresBack(ctx, areaKey);
+            breakables.draw(ctx, areaKey);
+        }
+
+        function collectSortedRenderables(areaKey) {
+            const items = [];
+            mapNpcs.forEach((mob) => {
+                if (mob.area !== areaKey) return;
+                items.push({ y: mob.y, kind: 'npc', mob });
+            });
+            enemies.forEach((enemy) => {
+                if (!enemy.isAlive || enemy.area !== areaKey) return;
+                items.push({ y: enemy.y, kind: 'enemy', enemy });
+            });
+            items.push({ y: player.y, kind: 'player' });
+            items.sort((a, b) => a.y - b.y);
+            return items;
+        }
+
+        // メインループ
+        function gameLoop() {
+            if (GameState.started && !GameState.paused) {
+                if (GameState.minigame === 'invaders') {
+                    invaderGame.update(keys);
+                    if (keys['KeyE'] || keys['InteractTrigger']) {
+                        keys['KeyE'] = false;
+                        keys['InteractTrigger'] = false;
+                        finishInvaders();
+                    }
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.save();
+                    camera.apply(ctx);
+                    renderMapDecorations(ctx, GameState.currentArea);
+                    collectSortedRenderables(GameState.currentArea).forEach((item) => {
+                        if (item.kind === 'npc') item.mob.draw(ctx);
+                        else if (item.kind === 'enemy') item.enemy.draw(ctx);
+                        else player.draw(ctx);
+                    });
+                    renderMapStructuresFront(ctx, GameState.currentArea);
+                    ctx.restore();
+                    const view = cssView();
+                    ctx.setTransform(canvasDpr(), 0, 0, canvasDpr(), 0, 0);
+                    invaderGame.draw(ctx, view.w, view.h);
+                    requestAnimationFrame(gameLoop);
+                    return;
+                }
+
+                const steps = combatFeel.consumeStep();
+                if (steps && !GameState.dialogActive) {
+                    player.update(keys);
+                    mapNpcs.forEach((mob) => mob.update());
+                    enemies.forEach(e => e.update(player));
+                    projectiles.update(player, enemies, onPlayerProjectileHit, onEnemyProjectileHit);
+                    breakables.update();
+                    comboRank.update();
+                    checkPortalsAndInteractions();
+                    vfxManager.update();
+                } else if (steps) {
+                    vfxManager.update();
+                    comboRank.update();
+                }
+                camera.follow(player);
+                updateHUD();
+
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                ctx.save();
+                camera.apply(ctx);
+
+                renderMapDecorations(ctx, GameState.currentArea);
+
+                collectSortedRenderables(GameState.currentArea).forEach((item) => {
+                    if (item.kind === 'npc') item.mob.draw(ctx);
+                    else if (item.kind === 'enemy') item.enemy.draw(ctx);
+                    else player.draw(ctx);
+                });
+
+                renderMapStructuresFront(ctx, GameState.currentArea);
+                projectiles.draw(ctx);
+                vfxManager.draw(ctx);
+
+                ctx.restore();
+                const view = cssView();
+                ctx.setTransform(canvasDpr(), 0, 0, canvasDpr(), 0, 0);
+                combatFeel.drawOverlay(ctx, view.w, view.h);
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // スタートボタン処理
+        bindTap(document.getElementById('start-btn'), () => {
+            audio.init();
+            GameState.started = true;
+            document.getElementById('start-overlay').classList.add('hidden');
+            showNotification("冒険開始！赤い予兆中に回避でJUST。Qで武器切替。");
+        });
+
+        // 特徴モーダル表示
+        document.getElementById('show-features-btn').addEventListener('click', () => {
+            document.getElementById('features-modal').classList.remove('hidden');
+        });
+        document.getElementById('close-features-btn').addEventListener('click', () => {
+            document.getElementById('features-modal').classList.add('hidden');
+        });
+
+        async function initSkeletalAnimator() {
+            await Promise.all([
+                skeletal.loadSprite(HERO_SPRITE_URL),
+                loadCharArt()
+            ]);
+            Object.keys(HERO_FRAMES).forEach((name) => {
+                skeletal.defineFrames(name, HERO_FRAMES[name]);
+            });
+            GameState.skeletalReady = skeletal.isLoaded;
+        }
+
+        // ゲーム起動ループ開始
+        window.onload = () => {
+            resizeCanvas();
+            initSkeletalAnimator();
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
