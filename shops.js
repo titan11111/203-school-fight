@@ -304,25 +304,30 @@
 
         draw(ctx, w, h) {
             if (!this.active) return;
-            const gw = 400;
-            const gh = 280;
-            const x = (w - gw) / 2;
-            const y = (h - gh) / 2 - 20;
+            const baseGw = 400;
+            const baseGh = 280;
+            const chromeH = 56;
+            const scale = Math.min(1, (w - 8) / (baseGw + 16), (h - 8) / (baseGh + chromeH));
+            const drawW = (baseGw + 16) * scale;
+            const drawH = (baseGh + chromeH) * scale;
+            const x = (w - drawW) / 2;
+            const y = Math.max(4, (h - drawH) / 2);
             ctx.save();
             ctx.fillStyle = 'rgba(0,0,0,0.62)';
             ctx.fillRect(0, 0, w, h);
             ctx.translate(x, y);
+            ctx.scale(scale, scale);
             ctx.fillStyle = '#020617';
-            ctx.fillRect(-8, -28, gw + 16, gh + 56);
+            ctx.fillRect(-8, -28, baseGw + 16, baseGh + chromeH);
             ctx.strokeStyle = '#22d3ee';
             ctx.lineWidth = 3;
-            ctx.strokeRect(-8, -28, gw + 16, gh + 56);
+            ctx.strokeRect(-8, -28, baseGw + 16, baseGh + chromeH);
             ctx.fillStyle = '#67e8f9';
             ctx.font = 'bold 14px DotGothic16, sans-serif';
             ctx.textAlign = 'left';
             ctx.fillText('INVADER  SCORE ' + this.score + '  LIFE ' + this.lives, 8, -8);
             ctx.fillStyle = '#0f172a';
-            ctx.fillRect(0, 0, gw, gh);
+            ctx.fillRect(0, 0, baseGw, baseGh);
 
             this.aliens.forEach((a) => {
                 if (!a.alive) return;

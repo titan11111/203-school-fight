@@ -56,13 +56,36 @@
             overflow: hidden;
             background: #000;
         }
-        #game-canvas {
-            display: block;
-            width: 100%;
+        #screen.ending-on #virtual-controls,
+        #screen.ending-on #hud-top,
+        #screen.ending-on #combo-hud {
+            display: none !important;
+        }
+        #screen.minigame-on #hud-top,
+        #screen.minigame-on #combo-hud {
+            display: none !important;
+        }
+        #screen.minigame-on #game-stage {
+            flex: 0 0 80%;
+            height: 80%;
+        }
+        #screen.minigame-on #virtual-controls {
+            flex: 0 0 20%;
+            height: 20%;
+        }
+        @media (max-width: 480px) {
+            #screen.minigame-on #game-stage {
+                flex: 0 0 84%;
+                height: 84%;
+            }
+            #screen.minigame-on #virtual-controls {
+                flex: 0 0 16%;
+                height: 16%;
+            }
+        }
+        #screen.ending-on #game-stage {
+            flex: 1 1 auto;
             height: 100%;
-            -webkit-user-select: none;
-            -webkit-touch-callout: none;
-            -webkit-user-drag: none;
         }
         button, canvas, img, svg {
             -webkit-user-select: none;
@@ -564,7 +587,7 @@
             hasSaber: false,
             bossPhase: 1,
             minigame: null,
-            portalLock: 0
+            ending: false
         };
         window.GameState = GameState;
 
@@ -902,6 +925,19 @@
                     this.synth.triggerAttackRelease(["G3", "D4"], "16n");
                     if (this.bgmSynth) this.bgmSynth.triggerAttackRelease("C2", "32n");
                 }
+            }
+
+            playPico() {
+                if (!GameState.audioInitialized || !this.synth) return;
+                this._pico = (this._pico || 0) + 1;
+                const note = this._pico % 2 ? 'C6' : 'G6';
+                this._trig(this.synth, note, '64n', 0.001);
+            }
+
+            playEndCard() {
+                if (!GameState.audioInitialized || !this.synth) return;
+                this._trig(this.synth, ['C5', 'E5', 'G5'], '8n', 0.001);
+                this._trig(this.synth, 'C6', '4n', 0.24);
             }
 
             playTap() {
@@ -1396,7 +1432,7 @@
                 this.x = WORLD_WIDTH / 2;
                 this.y = WORLD_HEIGHT / 2 + 100;
                 this.radius = 22;
-                this.speed = 4.5;
+                this.speed = 5.85; // 4.5 × 1.3（携帯のもっさり感対策）
                 this.vx = 0;
                 this.vy = 0;
                 this.facing = 'down'; // up, down, left, right
@@ -2341,10 +2377,17 @@
             showDialog('くじ引き', [prize.title, prize.text]);
         }
 
+        function setMinigameLayout(on) {
+            const screen = document.getElementById('screen');
+            if (screen) screen.classList.toggle('minigame-on', on);
+            resizeCanvas();
+        }
+
         function startArcade(id) {
             const game = arcadeGames[id];
             if (!game) return;
             GameState.minigame = id;
+            setMinigameLayout(true);
             game.start();
         }
 
@@ -2353,6 +2396,7 @@
             if (!game) return;
             const score = game.quit();
             GameState.minigame = null;
+            setMinigameLayout(false);
             const payout = Math.floor(score / 5);
             if (payout > 0) {
                 GameState.money += payout;
@@ -3254,9 +3298,262 @@
             }
         }
 
+        const ENDING_LINE = '校長の呪いが解けて、学校に平和が戻った。これで一安心だ';
+        const ending = {
+            active: false,
+            tick: 0,
+            charI: 0,
+            wait: 0,
+            hold: 0,
+            phase: 'talk',
+            endFade: 0,
+            endPlayed: false,
+            hero: null,
+            friends: [],
+            petals: []
+        };
+
+        function bounceEnding(r, minX, maxX, minY, maxY) {
+            r.x += r.vx;
+            r.y += r.vy;
+            if (r.x < minX || r.x > maxX) {
+                r.vx *= -1;
+                r.x = Math.max(minX, Math.min(maxX, r.x));
+            }
+            if (r.y < minY || r.y > maxY) {
+                r.vy *= -1;
+                r.y = Math.max(minY, Math.min(maxY, r.y));
+            }
+            r.facing = r.vx < 0 ? 'left' : 'right';
+        }
+
+        function revealEndingCard() {
+            if (ending.phase === 'end') return;
+            ending.phase = 'end';
+            ending.hold = 0;
+            ending.endFade = 0;
+            if (!ending.endPlayed) {
+                ending.endPlayed = true;
+                audio.playEndCard();
+            }
+        }
+
+        function startEnding() {
+            GameState.ending = true;
+            GameState.dialogActive = false;
+            GameState.dialogCallback = null;
+            const box = document.getElementById('dialog-box');
+            if (box) box.classList.add('hidden');
+            document.getElementById('screen').classList.add('ending-on');
+            GameState.currentArea = 'SCHOOL';
+            audio.updateMutter(false);
+            audio.playAreaBgm('SCHOOL', true);
+            projectiles.live.forEach((p) => { p.life = 0; });
+            camera.shakeAmount = 0;
+            camera.zoom = 1;
+            camera.zoomTarget = 1;
+            ending.active = true;
+            ending.tick = 0;
+            ending.charI = 0;
+            ending.wait = 10;
+            ending.hold = 0;
+            ending.phase = 'talk';
+            ending.endFade = 0;
+            ending.endPlayed = false;
+            ending.hero = { x: 760, y: 640, vx: 2.6, vy: 1.1, facing: 'right' };
+            ending.friends = [
+                { kind: 'child', x: 620, y: 700, vx: -2.2, vy: 1.3, facing: 'left' },
+                { kind: 'delinquent', x: 980, y: 580, vx: 2.0, vy: -1.1, facing: 'right' },
+                { kind: 'child', x: 540, y: 760, vx: 2.4, vy: -0.8, scale: 0.92, facing: 'right' },
+                { kind: 'rabbit', x: 1100, y: 680, vx: -2.8, vy: 1.4, facing: 'left' }
+            ];
+            ending.petals = [];
+            for (let i = 0; i < 24; i++) {
+                ending.petals.push({
+                    x: 220 + Math.random() * 1160,
+                    y: 40 + Math.random() * 820,
+                    s: 3 + Math.random() * 4,
+                    vx: -0.55 + Math.random() * 1.1,
+                    vy: 0.32 + Math.random() * 0.5
+                });
+            }
+            player.x = ending.hero.x;
+            player.y = ending.hero.y;
+            player.facing = 'right';
+            player.animationState = 'walk_right';
+            player.isAttacking = false;
+            player.hurtTimer = 0;
+            player.iFrames = 0;
+            const view = cssView();
+            camera.x = 800 - view.w / 2;
+            camera.y = 36;
+            requestAnimationFrame(() => {
+                resizeCanvas();
+                const v = cssView();
+                camera.x = 800 - v.w / 2;
+                camera.y = 36;
+            });
+        }
+        window.startEnding = startEnding;
+
+        function skipEndingText() {
+            if (!GameState.ending) return;
+            if (ending.charI < ENDING_LINE.length) {
+                ending.charI = ENDING_LINE.length;
+                return;
+            }
+            revealEndingCard();
+        }
+
+        function updateEnding() {
+            ending.tick++;
+            bounceEnding(ending.hero, 320, 1280, 500, 820);
+            ending.friends.forEach((f) => bounceEnding(f, 320, 1280, 500, 820));
+            player.x = ending.hero.x;
+            player.y = ending.hero.y;
+            player.facing = ending.hero.facing;
+            player.animationState = 'walk_' + ending.hero.facing;
+            player.frameIndex = ((ending.tick / 6) | 0);
+            ending.petals.forEach((p) => {
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.y > 900) {
+                    p.y = 40;
+                    p.x = 220 + Math.random() * 1160;
+                }
+            });
+            if (ending.phase === 'talk') {
+                if (ending.wait > 0) {
+                    ending.wait--;
+                } else if (ending.charI < ENDING_LINE.length) {
+                    const ch = ENDING_LINE.charAt(ending.charI);
+                    ending.charI++;
+                    if (ch !== '、' && ch !== '。' && ch !== ' ') audio.playPico();
+                    ending.wait = ch === '。' ? 22 : (ch === '、' ? 12 : 5);
+                } else {
+                    ending.hold++;
+                    if (ending.hold > 48) revealEndingCard();
+                }
+            } else if (ending.endFade < 1) {
+                ending.endFade = Math.min(1, ending.endFade + 0.035);
+            }
+            const view = cssView();
+            const tx = 800 + Math.sin(ending.tick * 0.0034) * 28 - view.w / 2;
+            const ty = 40 + Math.cos(ending.tick * 0.0026) * 12;
+            camera.x += (tx - camera.x) * 0.08;
+            camera.y += (ty - camera.y) * 0.08;
+            camera.zoom = 1;
+            camera.shakeAmount = 0;
+            mapNpcs.forEach((mob) => {
+                if (mob.area === 'SCHOOL') mob.update();
+            });
+        }
+
+        function drawEndingPetals(ctx) {
+            ending.petals.forEach((p) => {
+                ctx.fillStyle = 'rgba(251, 182, 206, 0.85)';
+                ctx.beginPath();
+                ctx.ellipse(p.x | 0, p.y | 0, p.s, p.s * 0.55, p.x * 0.02, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+
+        function drawEndingText(ctx, view) {
+            const pad = 16;
+            const boxW = Math.min(view.w - 24, 420);
+            const boxH = 118;
+            const x = ((view.w - boxW) / 2) | 0;
+            const y = (view.h - boxH - 18) | 0;
+            const boxA = ending.phase === 'end' ? 1 - ending.endFade : 1;
+            if (boxA > 0.04) {
+                ctx.globalAlpha = boxA;
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.82)';
+                ctx.fillRect(x, y, boxW, boxH);
+                ctx.strokeStyle = '#f9a8d4';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x + 1, y + 1, boxW - 2, boxH - 2);
+                ctx.fillStyle = '#fda4af';
+                ctx.font = 'bold 11px DotGothic16, sans-serif';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'top';
+                ctx.fillText('語り', x + pad, y + 10);
+                ctx.fillStyle = '#f8fafc';
+                ctx.font = 'bold 16px DotGothic16, sans-serif';
+                const shown = ENDING_LINE.slice(0, ending.charI);
+                const maxW = boxW - pad * 2;
+                let line = '';
+                let ty = y + 32;
+                for (let i = 0; i < shown.length; i++) {
+                    const test = line + shown[i];
+                    if (ctx.measureText(test).width > maxW && line) {
+                        ctx.fillText(line, x + pad, ty);
+                        line = shown[i];
+                        ty += 24;
+                    } else {
+                        line = test;
+                    }
+                }
+                if (line) ctx.fillText(line, x + pad, ty);
+                ctx.globalAlpha = 1;
+            }
+            if (ending.phase !== 'end') return;
+            const fade = ending.endFade;
+            ctx.fillStyle = 'rgba(15, 23, 42, ' + (0.42 * fade).toFixed(3) + ')';
+            ctx.fillRect(0, 0, view.w, view.h);
+            ctx.save();
+            ctx.globalAlpha = fade;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            const cx = (view.w / 2) | 0;
+            const cy = ((view.h * 0.42) | 0);
+            ctx.fillStyle = '#fde68a';
+            ctx.font = '900 52px DotGothic16, sans-serif';
+            ctx.fillText('END', cx, cy);
+            ctx.fillStyle = '#fda4af';
+            ctx.font = 'bold 14px DotGothic16, sans-serif';
+            ctx.fillText('おわり', cx, cy + 42);
+            ctx.restore();
+        }
+
+        canvas.addEventListener('pointerdown', skipEndingText);
+
         // メインループ
         function gameLoop() {
             if (GameState.started && !GameState.paused) {
+                if (GameState.ending) {
+                    updateEnding();
+                    ctx.setTransform(1, 0, 0, 1, 0, 0);
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.save();
+                    camera.apply(ctx);
+                    renderMapDecorations(ctx, 'SCHOOL');
+                    const items = [];
+                    mapNpcs.forEach((mob) => {
+                        if (mob.area === 'SCHOOL') items.push({ y: mob.y, kind: 'npc', mob });
+                    });
+                    items.push({ y: player.y, kind: 'player' });
+                    ending.friends.forEach((f) => items.push({ y: f.y, kind: 'friend', friend: f }));
+                    items.sort((a, b) => a.y - b.y);
+                    items.forEach((item) => {
+                        if (item.kind === 'npc') item.mob.draw(ctx);
+                        else if (item.kind === 'player') player.draw(ctx);
+                        else {
+                            const f = item.friend;
+                            const bob = Math.sin(ending.tick * 0.38 + f.x) * 3;
+                            drawCharArt(ctx, f.kind, f.x | 0, (f.y + bob) | 0, f.facing, null, { scale: f.scale || 1 });
+                        }
+                    });
+                    renderMapStructuresFront(ctx, 'SCHOOL');
+                    drawEndingPetals(ctx);
+                    ctx.restore();
+                    const view = cssView();
+                    ctx.setTransform(canvasDpr(), 0, 0, canvasDpr(), 0, 0);
+                    ctx.fillStyle = 'rgba(251, 146, 60, 0.08)';
+                    ctx.fillRect(0, 0, view.w, view.h);
+                    drawEndingText(ctx, view);
+                    requestAnimationFrame(gameLoop);
+                    return;
+                }
                 const arcade = currentArcade();
                 if (arcade) {
                     arcade.update(keys);

@@ -213,6 +213,7 @@
         updateCharge() {}
 
         takeDamage(amount, fromX, fromY, opts) {
+            if (!this.isAlive) return;
             opts = opts || {};
             const rank = comboRank.rank;
             const brokenBonus = this.broken > 0 ? 1.5 : 1;
@@ -619,9 +620,8 @@
         }
 
         onDefeated() {
-            showDialog('暗黒校長', ['グハッ…正気に戻ったぞ…！', '見事だ若きヒーローよ！放課後の平和は守られた！'], () => {
-                showNotification("🎉 ゲームクリア！おめでとうございます！");
-            });
+            if (GameState.ending) return;
+            if (typeof window.startEnding === 'function') window.startEnding();
         }
     }
 
