@@ -16,7 +16,7 @@
             this.maxPoise = 40;
             this.broken = 0;
             this.telegraphR = 70;
-            this._uid = (x * 1000 + y) | 0;
+            this._uid = Enemy.nextUid++;
             this.homeX = x;
             this.homeY = y;
             this.patrolRadius = 85;
@@ -38,6 +38,12 @@
             this.flipArt = false;
             this.bobScale = 2.8;
             this.isBoss = false;
+            this.hurtTimer = 0;
+            this.flashTimer = 0;
+            this.kbX = 0;
+            this.kbY = 0;
+            this.hurtW = 64;
+            this.hurtH = 128;
         }
 
         pickPatrolTarget() {
@@ -137,7 +143,7 @@
         }
 
         onAttackFrame(player, dist) {
-            if (dist < this.radius + player.radius + 28) player.takeDamage(this.atk);
+            if (CombatKit.bodiesOverlap(this, player, 10)) player.takeDamage(this.atk);
             camera.shake(8);
         }
 
@@ -151,6 +157,27 @@
             const dist = Math.hypot(player.x - this.x, player.y - this.y);
             this.isMoving = false;
             this.inJustWindow = false;
+            if (this.flashTimer > 0) this.flashTimer--;
+
+            if (this.hurtTimer > 0) {
+                this.hurtTimer--;
+                this.x += this.kbX;
+                this.y += this.kbY;
+                this.kbX *= 0.84;
+                this.kbY *= 0.84;
+                applyMapCollision(this, GameState.currentArea);
+                this.animTimer++;
+                if (this.hurtTimer <= 0) {
+                    this.kbX = 0;
+                    this.kbY = 0;
+                    if (this.broken <= 0) {
+                        this.state = 'COOLDOWN';
+                        this.stateTimer = 8;
+                    }
+                }
+                this.afterUpdate(player);
+                return;
+            }
 
             if (this.broken > 0) {
                 this.broken--;
@@ -241,9 +268,31 @@
             }
 
             const angle = Math.atan2(this.y - fromY, this.x - fromX);
-            const kb = opts.pull ? -28 : 20;
-            this.x += Math.cos(angle) * kb;
-            this.y += Math.sin(angle) * kb;
+            const scale = this.isBoss ? 0.32 : 1;
+            let dx;
+            let dy;
+            if (opts.pull) {
+                dx = fromX - this.x;
+                dy = fromY - this.y;
+            } else {
+                dx = opts.kbX;
+                dy = opts.kbY;
+                if (dx == null || dy == null || (dx * dx + dy * dy) < 0.04) {
+                    dx = Math.cos(angle);
+                    dy = Math.sin(angle);
+                }
+            }
+            const len = Math.hypot(dx, dy) || 1;
+            const nx = dx / len;
+            const ny = dy / len;
+            const snap = (opts.pull ? 22 : 18) * scale;
+            this.x += nx * snap;
+            this.y += ny * snap;
+            this.kbX = nx * (opts.pull ? 3.2 : 5.2) * scale;
+            this.kbY = ny * (opts.pull ? 3.2 : 5.2) * scale;
+            this.hurtTimer = this.isBoss ? 8 : 14;
+            this.flashTimer = 10;
+            this.state = 'HURT';
             applyMapCollision(this, GameState.currentArea);
 
             breakables.hitAt(this.x, this.y, 40, 8, (d) => {
@@ -277,9 +326,20 @@
 
             const anim = this.getAnim();
             if (this.broken > 0) anim.squash = 0.82;
+            if (this.hurtTimer > 0) anim.squash = 0.9;
             if (this.teleportFlash > 0) ctx.globalAlpha = this.teleportFlash % 2 ? 0.25 : 0.9;
+            else if (this.flashTimer > 0) ctx.globalAlpha = this.flashTimer % 2 ? 0.4 : 1;
             const h = this.drawBody(ctx, anim);
             ctx.globalAlpha = 1;
+
+            if (global.GameState && global.GameState.debugHitboxes && global.CombatKit) {
+                const box = CombatKit.spriteBox(this);
+                ctx.save();
+                ctx.strokeStyle = 'rgba(244, 114, 182, 0.95)';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(box.x | 0, box.y | 0, box.w | 0, box.h | 0);
+                ctx.restore();
+            }
 
             ctx.save();
             const barWidth = Math.max(40, (h * 0.55) | 0);
@@ -297,6 +357,7 @@
             return drawCharArt(ctx, this.artKey, this.x, this.y, this.facing, this.flipArt ? true : null, anim);
         }
     }
+    Enemy.nextUid = 1;
 
     class Delinquent extends Enemy {
         constructor(x, y, area) {
@@ -313,6 +374,8 @@
             this.sprite = '😼';
             this.poise = this.maxPoise = 46;
             this.telegraphR = 78;
+            this.hurtW = 64;
+            this.hurtH = 128;
         }
     }
 
@@ -333,6 +396,8 @@
             this.telegraphR = 64;
             this.flipArt = true;
             this.bobScale = 4.2;
+            this.hurtW = 64;
+            this.hurtH = 96;
         }
     }
 
@@ -353,6 +418,8 @@
             this.telegraphR = 52;
             this.patrolRadius = 110;
             this.bobScale = 4.2;
+            this.hurtW = 64;
+            this.hurtH = 96;
         }
     }
 
@@ -373,6 +440,8 @@
             this.telegraphR = 54;
             this.patrolRadius = 95;
             this.bobScale = 4.2;
+            this.hurtW = 64;
+            this.hurtH = 96;
         }
     }
 
@@ -394,6 +463,8 @@
             this.patrolRadius = 160;
             this.chargeVx = 0;
             this.chargeVy = 0;
+            this.hurtW = 80;
+            this.hurtH = 96;
         }
 
         getWindupRange() {
@@ -420,7 +491,7 @@
             this.isMoving = true;
             this.updateFacingFrom(this.chargeVx, this.chargeVy);
             applyMapCollision(this, GameState.currentArea);
-            if (dist < this.radius + player.radius + 8) {
+            if (CombatKit.bodiesOverlap(this, player, 8)) {
                 player.takeDamage(this.atk);
                 camera.shake(14);
                 this.state = 'COOLDOWN';
@@ -452,6 +523,8 @@
             this.telegraphR = 86;
             this.drawScale = 1.25;
             this.patrolRadius = 70;
+            this.hurtW = 90;
+            this.hurtH = 150;
         }
 
         getAnim() {
@@ -488,6 +561,8 @@
             this.heavyTimer = 70;
             this.patrolRadius = 130;
             this.isBoss = true;
+            this.hurtW = 170;
+            this.hurtH = 390;
         }
 
         getPatrolSpeed() {
@@ -527,7 +602,7 @@
 
         onAttackFrame(player, dist) {
             if (this.phase >= 2) this.fireBossVolley();
-            if (dist < this.radius + player.radius + 28) player.takeDamage(this.atk);
+            if (CombatKit.bodiesOverlap(this, player, 12)) player.takeDamage(this.atk);
             camera.shake(18);
         }
 

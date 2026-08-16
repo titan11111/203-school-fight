@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>保健室の先生 全身SVGアニメーション</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700;800&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"M PLUS Rounded 1c"', 'Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        nurse: {
+                            50: '#fff1f2',
+                            100: '#ffe4e6',
+                            200: '#fecdd3',
+                            300: '#fda4af',
+                            400: '#fb7185',
+                            500: '#f43f5e',
+                            600: '#e11d48',
+                            700: '#be123c',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+
+        /* カスタムキーフレームアニメーション */
+        @keyframes breathe {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-5px); }
+        }
+
+        @keyframes hairSwayLeft {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(-3deg); }
+        }
+
+        @keyframes hairSwayRight {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(3deg); }
+        }
+
+        @keyframes coatSwayLeft {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(-2.5deg); }
+        }
+
+        @keyframes coatSwayRight {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(2.5deg); }
+        }
+
+        @keyframes waveRightArm {
+            0%, 100% { transform: rotate(0deg); }
+            50% { transform: rotate(-15deg); }
+        }
+
+        @keyframes blinkEye {
+            0%, 94%, 98%, 100% { transform: scaleY(1); }
+            96% { transform: scaleY(0.05); }
+        }
+
+        @keyframes floatHeart {
+            0% { transform: translateY(0) scale(0.8); opacity: 0; }
+            50% { opacity: 0.8; }
+            100% { transform: translateY(-40px) scale(1.2); opacity: 0; }
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { filter: drop-shadow(0 0 15px rgba(251, 113, 133, 0.3)); }
+            50% { filter: drop-shadow(0 0 25px rgba(251, 113, 133, 0.6)); }
+        }
+
+        /* アニメーション適用クラス */
+        .anim-breathe {
+            animation: breathe 3.5s ease-in-out infinite;
+            transform-origin: bottom center;
+        }
+
+        .anim-hair-left {
+            animation: hairSwayLeft 4s ease-in-out infinite;
+            transform-origin: 190px 140px;
+        }
+
+        .anim-hair-right {
+            animation: hairSwayRight 4.5s ease-in-out infinite;
+            transform-origin: 210px 140px;
+        }
+
+        .anim-coat-left {
+            animation: coatSwayLeft 3.8s ease-in-out infinite;
+            transform-origin: 140px 300px;
+        }
+
+        .anim-coat-right {
+            animation: coatSwayRight 4.2s ease-in-out infinite;
+            transform-origin: 260px 300px;
+        }
+
+        .anim-wave-arm {
+            animation: waveRightArm 2s ease-in-out infinite;
+            transform-origin: 250px 280px;
+        }
+
+        .anim-blink {
+            animation: blinkEye 4s infinite;
+            transform-origin: 200px 185px;
+        }
+
+        .anim-heart-1 { animation: floatHeart 3s ease-out infinite; }
+        .anim-heart-2 { animation: floatHeart 3s ease-out infinite 1s; }
+        .anim-heart-3 { animation: floatHeart 3s ease-out infinite 2s; }
+
+        .svg-container {
+            animation: pulseGlow 4s ease-in-out infinite;
+        }
+
+        /* アニメーション一時停止 */
+        .paused * {
+            animation-play-state: paused !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col justify-between">
+
+    <!-- ヘッダー -->
+    <header class="bg-white/80 backdrop-blur-md border-b border-rose-100 sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-rose-500 text-white flex items-center justify-center font-bold text-xl shadow-md">
+                    +
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-800 leading-tight">保健室の先生 (全身SVGイラスト)</h1>
+                    <p class="text-xs text-rose-500 font-medium">アニメーション＆インタラクティブ・モデル</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button id="toggleAnimBtn" onclick="toggleAnimation()" class="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs md:text-sm font-semibold rounded-lg transition-all flex items-center space-x-1">
+                    <span id="animIcon">⏸️</span>
+                    <span id="animText">アニメーション停止</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="max-w-6xl mx-auto px-4 py-6 w-full flex-grow grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+
+        <!-- 左側：全身SVGプレビューエリア -->
+        <div class="lg:col-span-6 flex flex-col items-center">
+            <div class="relative w-full max-w-[420px] bg-gradient-to-b from-rose-50/70 via-white to-sky-50/50 border border-rose-100/80 rounded-3xl p-4 md:p-6 shadow-xl flex items-center justify-center overflow-hidden svg-container">
+                
+                <!-- 保健室風の背景背景パターン（グリッド & 窓風モチーフ） -->
+                <div class="absolute inset-0 opacity-20 bg-[radial-gradient(#fb7185_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none"></div>
+                <div class="absolute top-4 right-4 w-20 h-28 border-2 border-rose-200/50 rounded-xl bg-white/40 backdrop-blur-sm pointer-events-none flex flex-col">
+                    <div class="h-1/2 border-b border-rose-200/50"></div>
+                    <div class="w-1/2 h-full border-r border-rose-200/50 self-center"></div>
+                </div>
+
+                <!-- 保健室の先生 全身SVG -->
+                <svg id="nurseSvg" viewBox="0 0 400 800" class="w-full h-auto max-h-[72vh] drop-shadow-md select-none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <!-- グラデーション定義 -->
+                        <!-- 髪のグラデーション -->
+                        <linearGradient id="hairGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#8d5b4c" />
+                            <stop offset="50%" stop-color="#6f4233" />
+                            <stop offset="100%" stop-color="#542e22" />
+                        </linearGradient>
+                        <linearGradient id="hairHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#b88373" stop-opacity="0.8" />
+                            <stop offset="100%" stop-color="#8d5b4c" stop-opacity="0" />
+                        </linearGradient>
+
+                        <!-- 肌のグラデーション -->
+                        <linearGradient id="skinGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#fff5f0" />
+                            <stop offset="100%" stop-color="#ffebd9" />
+                        </linearGradient>
+
+                        <!-- 白衣の影グラデーション -->
+                        <linearGradient id="coatShadow" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#ffffff" />
+                            <stop offset="85%" stop-color="#f1f5f9" />
+                            <stop offset="100%" stop-color="#e2e8f0" />
+                        </linearGradient>
+
+                        <!-- スカートのグラデーション -->
+                        <linearGradient id="skirtGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#3b82f6" />
+                            <stop offset="100%" stop-color="#1d4ed8" />
+                        </linearGradient>
+
+                        <!-- インナーピンクグラデーション -->
+                        <linearGradient id="innerGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#fb7185" />
+                            <stop offset="100%" stop-color="#f43f5e" />
+                        </linearGradient>
+
+                        <!-- 浮遊ハート定義 -->
+                        <g id="heartParticle">
+                            <path d="M12,21.35l-1.45-1.32C5.4,15.36,2,12.28,2,8.5C2,5.42,4.42,3,7.5,3c1.74,0,3.41,0.81,4.5,2.09C13.09,3.81,14.76,3,16.5,3C19.58,3,22,5.42,22,8.5c0,3.78-3.4,6.86-8.55,11.54L12,21.35Z" fill="#fb7185" opacity="0.7"/>
+                        </g>
+
+                        <!-- ドロップシャドウフィルター -->
+                        <filter id="softShadow" x="-10%" y="-10%" width="120%" height="120%">
+                            <feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity="0.1" />
+                        </filter>
+                    </defs>
+
+                    <!-- 背景浮遊エフェクト (ハート) -->
+                    <g id="heartGroup">
+                        <use href="#heartParticle" x="60" y="220" transform="scale(0.8)" class="anim-heart-1" />
+                        <use href="#heartParticle" x="310" y="180" transform="scale(1.1)" class="anim-heart-2" />
+                        <use href="#heartParticle" x="80" y="400" transform="scale(0.6)" class="anim-heart-3" />
+                    </g>
+
+                    <!-- 足元の影 -->
+                    <ellipse cx="200" cy="745" rx="90" ry="14" fill="#cbd5e1" opacity="0.6" />
+
+                    <!-- 全身アニメーション（呼吸）グループ -->
+                    <g id="wholeBody" class="anim-breathe">
+
+                        <!-- 後ろ髪（ロングヘアーの背景部分） -->
+                        <g id="backHair" class="anim-hair-right">
+                            <path d="M140,160 Q120,250 145,350 Q170,360 180,310 Z" fill="url(#hairGrad)" />
+                            <path d="M260,160 Q280,250 255,350 Q230,360 220,310 Z" fill="url(#hairGrad)" />
+                        </g>
+
+                        <!-- 白衣の後ろ裾（なびき） -->
+                        <path d="M145,400 Q135,530 130,590 Q200,600 270,590 Q265,530 255,400 Z" fill="#e2e8f0" opacity="0.5" />
+
+                        <!-- 脚（タイツ／ストッキング） -->
+                        <g id="legs">
+                            <!-- 左脚 -->
+                            <path d="M172,500 L168,660 Q167,710 165,725 L188,725 Q188,700 190,660 L192,500 Z" fill="#f7e5d6" />
+                            <!-- 右脚 -->
+                            <path d="M208,500 L210,660 Q212,700 212,725 L235,725 Q233,710 232,660 L228,500 Z" fill="#f7e5d6" />
+                            <!-- 膝のうっすら影 -->
+                            <ellipse cx="178" cy="590" rx="6" ry="3" fill="#f43f5e" opacity="0.15" />
+                            <ellipse cx="222" cy="590" rx="6" ry="3" fill="#f43f5e" opacity="0.15" />
+                        </g>
+
+                        <!-- ナースシューズ／パンプス -->
+                        <g id="shoes">
+                            <!-- 左靴 -->
+                            <path d="M152,725 C152,718 165,715 178,715 C190,715 192,722 192,728 C192,735 180,738 162,738 C153,738 152,732 152,725 Z" fill="#ffffff" filter="url(#softShadow)" />
+                            <path d="M152,725 C155,720 170,720 185,723" stroke="#f43f5e" stroke-width="2" fill="none" />
+                            <ellipse cx="172" cy="726" rx="14" ry="4" fill="#ffe4e6" />
+
+                            <!-- 右靴 -->
+                            <path d="M208,728 C208,722 210,715 222,715 C235,715 248,718 248,725 C248,732 247,738 238,738 C220,738 208,735 208,728 Z" fill="#ffffff" filter="url(#softShadow)" />
+                            <path d="M215,723 C230,720 245,720 248,725" stroke="#f43f5e" stroke-width="2" fill="none" />
+                            <ellipse cx="228" cy="726" rx="14" ry="4" fill="#ffe4e6" />
+                        </g>
+
+                        <!-- スカート -->
+                        <path id="skirt" d="M160,380 L140,510 Q200,530 260,510 L240,380 Z" fill="url(#skirtGrad)" />
+                        <!-- スカートのひだライン -->
+                        <path d="M180,385 L175,516 M200,385 L200,520 M220,385 L225,516" stroke="#1e40af" stroke-width="1.5" opacity="0.4" />
+
+                        <!-- インナー（トップス） -->
+                        <path d="M165,270 L235,270 L240,385 L160,385 Z" fill="url(#innerGrad)" />
+                        <!-- 襟元のデザイン -->
+                        <path d="M185,270 L200,295 L215,270 Z" fill="#ffffff" />
+
+                        <!-- 白衣の前身頃（左右） -->
+                        <!-- 白衣 左側 -->
+                        <g class="anim-coat-left">
+                            <path d="M160,265 L125,420 L132,580 Q170,575 185,565 L175,380 L180,270 Z" fill="url(#coatShadow)" filter="url(#softShadow)" />
+                            <!-- ポケット -->
+                            <rect x="140" y="440" width="30" height="35" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+                            <path d="M145,433 L145,445" stroke="#f43f5e" stroke-width="3" stroke-linecap="round" /> <!-- ペン -->
+                            <path d="M152,430 L152,445" stroke="#3b82f6" stroke-width="3" stroke-linecap="round" />
+                        </g>
+
+                        <!-- 白衣 右側 -->
+                        <g class="anim-coat-right">
+                            <path d="M240,265 L275,420 L268,580 Q230,575 215,565 L225,380 L220,270 Z" fill="url(#coatShadow)" filter="url(#softShadow)" />
+                            <!-- ポケット -->
+                            <rect x="230" y="440" width="30" height="35" rx="4" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" />
+                        </g>
+
+                        <!-- 白衣の襟（えり） -->
+                        <path d="M165,265 L140,310 L175,325 L182,270 Z" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+                        <path d="M235,265 L260,310 L225,325 L218,270 Z" fill="#ffffff" stroke="#cbd5e1" stroke-width="1" />
+
+                        <!-- 聴診器（首から掛けている） -->
+                        <g id="stethoscope">
+                            <path d="M175,270 Q165,310 180,360 Q200,390 210,360 Q225,310 225,270" fill="none" stroke="#fb7185" stroke-width="4" stroke-linecap="round" />
+                            <!-- チェストピース（診察部） -->
+                            <circle cx="180" cy="360" r="10" fill="#94a3b8" stroke="#ffffff" stroke-width="2" />
+                            <circle cx="180" cy="360" r="6" fill="#cbd5e1" />
+                            <!-- 耳当て部 -->
+                            <path d="M173,268 L170,255 M227,268 L230,255" stroke="#64748b" stroke-width="3" stroke-linecap="round" />
+                        </g>
+
+                        <!-- 首 -->
+                        <path d="M188,235 L212,235 L215,275 L185,275 Z" fill="#fde8d8" />
+                        <!-- 首の影 -->
+                        <path d="M188,255 Q200,265 212,255 L215,275 L185,275 Z" fill="#fca5a5" opacity="0.3" />
+
+                        <!-- 腕＆手のポーズグループ -->
+                        <!-- 【ポーズ 1】 デフォルト：手を前で軽く組む / カルテを持つ -->
+                        <g id="poseDefault">
+                            <!-- 左腕 -->
+                            <path d="M160,270 L130,360 L165,390 L178,350 L165,280 Z" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" />
+                            <!-- 右腕 -->
+                            <path d="M240,270 L270,360 L235,390 L222,350 L235,280 Z" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" />
+                            <!-- 手（左・右） -->
+                            <circle cx="172" cy="392" r="11" fill="#ffe0d0" />
+                            <circle cx="228" cy="392" r="11" fill="#ffe0d0" />
+
+                            <!-- 抱えているバインダー（カルテ） -->
+                            <g id="clipboard">
+                                <rect x="170" y="340" width="60" height="75" rx="5" fill="#0284c7" filter="url(#softShadow)" />
+                                <rect x="175" y="350" width="50" height="60" rx="2" fill="#ffffff" />
+                                <!-- バインダーの金具 -->
+                                <rect x="188" y="336" width="24" height="8" rx="2" fill="#94a3b8" />
+                                <!-- カルテの文字表現（線） -->
+                                <line x1="180" y1="360" x2="215" y2="360" stroke="#f43f5e" stroke-width="2" stroke-linecap="round" />
+                                <line x1="180" y1="370" x2="218" y2="370" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round" />
+                                <line x1="180" y1="380" x2="210" y2="380" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round" />
+                                <line x1="180" y1="390" x2="215" y2="390" stroke="#cbd5e1" stroke-width="2" stroke-linecap="round" />
+                                <!-- チェックマーク -->
+                                <path d="M210,398 L214,402 L220,394" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            </g>
+                        </g>
+
+                        <!-- 【ポーズ 2】 手を振る（バイバイ／おいで） -->
+                        <g id="poseWave" class="hidden">
+                            <!-- 左腕（腰に当てる） -->
+                            <path d="M160,270 L125,340 L150,360 L170,300 Z" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" />
+                            <circle cx="148" cy="358" r="11" fill="#ffe0d0" />
+
+                            <!-- 右腕（上にあげて振るアニメーション） -->
+                            <g class="anim-wave-arm">
+                                <path d="M240,270 L285,210 L305,225 L260,285 Z" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" />
+                                <!-- 手首から先 -->
+                                <g transform="translate(295, 205)">
+                                    <circle cx="0" cy="0" r="12" fill="#ffe0d0" />
+                                    <!-- 指 -->
+                                    <path d="M-6,-10 Q0,-16 4,-10 M0,-12 Q6,-15 8,-8 M4,-10 Q10,-10 10,-3" stroke="#ffe0d0" stroke-width="4" stroke-linecap="round" fill="none" />
+                                </g>
+                                <!-- きらきら効果 -->
+                                <path d="M315,180 L320,190 L330,195 L320,200 L315,210 L310,200 L300,195 L310,190 Z" fill="#fbbf24" opacity="0.8" />
+                            </g>
+                        </g>
+
+                        <!-- 【ポーズ 3】 体温計を持って検温確認 -->
+                        <g id="poseThermometer" class="hidden">
+                            <!-- 左腕（バインダーを脇に抱える） -->
+                            <path d="M160,270 L135,350 L160,370 L175,300 Z" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" />
+                            <circle cx="155" cy="365" r="11" fill="#ffe0d0" />
+                            <rect x="125" y="320" width="25" height="50" rx="3" fill="#0284c7" transform="rotate(15 125 320)" />
+
+                            <!-- 右腕（顔の前に体温計を掲げる） -->
+                            <path d="M240,270 L270,320 L235,320 L225,285 Z" fill="#ffffff" stroke="#e2e8f0" stroke-width="1" />
+                            <circle cx="240" cy="315" r="10" fill="#ffe0d0" />
+                            
+                            <!-- 体温計 -->
+                            <g transform="translate(230, 260) rotate(-10)">
+                                <rect x="0" y="0" width="12" height="55" rx="6" fill="#ffffff" stroke="#cbd5e1" stroke-width="1.5" filter="url(#softShadow)" />
+                                <rect x="3" y="15" width="6" height="15" fill="#38bdf8" />
+                                <!-- 液晶画面風テキスト -->
+                                <text x="6" y="26" font-size="7" font-weight="bold" fill="#0f172a" text-anchor="middle">36.6</text>
+                                <circle cx="6" cy="45" r="3" fill="#f43f5e" />
+                            </g>
+                        </g>
+
+                        <!-- 頭部＆顔グループ -->
+                        <g id="headGroup">
+                            <!-- 顔の輪郭（ベース） -->
+                            <path d="M150,150 C150,225 170,245 200,245 C230,245 250,225 250,150 C250,110 230,100 200,100 C170,100 150,110 150,150 Z" fill="url(#skinGrad)" filter="url(#softShadow)" />
+
+                            <!-- 耳 -->
+                            <ellipse cx="148" cy="165" rx="7" ry="12" fill="#ffebd9" />
+                            <ellipse cx="252" cy="165" rx="7" ry="12" fill="#ffebd9" />
+                            <!-- ピアスのアクセント -->
+                            <circle cx="148" cy="173" r="2.5" fill="#fb7185" />
+                            <circle cx="252" cy="173" r="2.5" fill="#fb7185" />
+
+                            <!-- 頬の紅潮（チーク） -->
+                            <ellipse cx="168" cy="182" rx="12" ry="6" fill="#fb7185" opacity="0.35" />
+                            <ellipse cx="232" cy="182" rx="12" ry="6" fill="#fb7185" opacity="0.35" />
+
+                            <!-- 鼻 -->
+                            <path d="M198,172 Q200,176 202,172" stroke="#e29d81" stroke-width="2" stroke-linecap="round" fill="none" />
+
+                            <!-- 表情：目（表情切替可能） -->
+                            <!-- 【目 1】 通常（笑顔・ぱっちり）+ まばたきアニメーション -->
+                            <g id="eyeNormal" class="anim-blink">
+                                <!-- 左目 -->
+                                <g>
+                                    <ellipse cx="175" cy="162" rx="9" ry="12" fill="#332211" />
+                                    <ellipse cx="175" cy="164" rx="7" ry="9" fill="#6f4233" />
+                                    <circle cx="172" cy="158" r="3.5" fill="#ffffff" /> <!-- ハイライト -->
+                                    <circle cx="177" cy="167" r="1.8" fill="#ffffff" />
+                                    <!-- まつ毛 -->
+                                    <path d="M164,158 Q175,150 186,156" stroke="#1f2937" stroke-width="2.5" fill="none" stroke-linecap="round" />
+                                    <path d="M184,154 L188,151" stroke="#1f2937" stroke-width="1.5" stroke-linecap="round" />
+                                </g>
+                                <!-- 右目 -->
+                                <g>
+                                    <ellipse cx="225" cy="162" rx="9" ry="12" fill="#332211" />
+                                    <ellipse cx="225" cy="164" rx="7" ry="9" fill="#6f4233" />
+                                    <circle cx="222" cy="158" r="3.5" fill="#ffffff" /> <!-- ハイライト -->
+                                    <circle cx="227" cy="167" r="1.8" fill="#ffffff" />
+                                    <!-- まつ毛 -->
+                                    <path d="M214,156 Q225,150 236,158" stroke="#1f2937" stroke-width="2.5" fill="none" stroke-linecap="round" />
+                                    <path d="M234,151 L238,154" stroke="#1f2937" stroke-width="1.5" stroke-linecap="round" />
+                                </g>
+                            </g>
+
+                            <!-- 【目 2】 ウィンク -->
+                            <g id="eyeWink" class="hidden">
+                                <!-- 左目（にっこりアーチ） -->
+                                <path d="M164,165 Q175,150 186,165" stroke="#1f2937" stroke-width="3.5" fill="none" stroke-linecap="round" />
+                                <!-- 右目（ぱっちり） -->
+                                <g>
+                                    <ellipse cx="225" cy="162" rx="9" ry="12" fill="#332211" />
+                                    <ellipse cx="225" cy="164" rx="7" ry="9" fill="#6f4233" />
+                                    <circle cx="222" cy="158" r="3.5" fill="#ffffff" />
+                                    <path d="M214,156 Q225,150 236,158" stroke="#1f2937" stroke-width="2.5" fill="none" stroke-linecap="round" />
+                                </g>
+                            </g>
+
+                            <!-- 【目 3】 心配・やさしく寄り添う（困り目） -->
+                            <g id="eyeWorried" class="hidden">
+                                <path d="M165,165 Q175,158 185,165" stroke="#1f2937" stroke-width="3" fill="none" stroke-linecap="round" />
+                                <path d="M215,165 Q225,158 235,165" stroke="#1f2937" stroke-width="3" fill="none" stroke-linecap="round" />
+                                <circle cx="175" cy="166" r="4" fill="#332211" />
+                                <circle cx="225" cy="166" r="4" fill="#332211" />
+                            </g>
+
+                            <!-- 眉毛 -->
+                            <g id="eyebrows">
+                                <path id="browLeft" d="M162,148 Q175,142 186,146" stroke="#542e22" stroke-width="2.5" fill="none" stroke-linecap="round" />
+                                <path id="browRight" d="M214,146 Q225,142 238,148" stroke="#542e22" stroke-width="2.5" fill="none" stroke-linecap="round" />
+                            </g>
+
+                            <!-- 表情：口（切り替え可能） -->
+                            <g id="mouthGroup">
+                                <!-- 【口 1】 にっこり笑顔（デフォルト） -->
+                                <path id="mouthSmile" d="M188,195 Q200,210 212,195 Z" fill="#f43f5e" />
+                                <!-- 【口 2】 優しいほほ笑み -->
+                                <path id="mouthGentle" d="M190,196 Q200,203 210,196" stroke="#e11d48" stroke-width="2.5" stroke-linecap="round" fill="none" class="hidden" />
+                                <!-- 【口 3】 「お喋り／大丈夫？」 -->
+                                <ellipse id="mouthOpen" cx="200" cy="198" rx="6" ry="8" fill="#be123c" class="hidden" />
+                            </g>
+
+                            <!-- 前髪・サイドの髪 -->
+                            <g id="frontHair">
+                                <!-- 前髪メイン -->
+                                <path d="M148,145 Q170,120 195,148 Q210,120 252,145 C255,110 235,80 200,80 C165,80 145,110 148,145 Z" fill="url(#hairGrad)" />
+                                <!-- 前髪の束（流れるような分け目） -->
+                                <path d="M170,100 Q190,135 182,152" stroke="url(#hairGrad)" stroke-width="12" fill="none" stroke-linecap="round" />
+                                <path d="M225,100 Q205,135 212,154" stroke="url(#hairGrad)" stroke-width="12" fill="none" stroke-linecap="round" />
+                                <path d="M195,95 L198,138" stroke="url(#hairGrad)" stroke-width="8" fill="none" stroke-linecap="round" />
+
+                                <!-- 髪のツヤ（ハイライト） -->
+                                <path d="M162,110 Q200,98 238,110" stroke="url(#hairHighlight)" stroke-width="5" fill="none" opacity="0.6" stroke-linecap="round" />
+
+                                <!-- 横の髪（揺れるサイドヘア） -->
+                                <path d="M148,140 Q135,180 142,220 Q150,225 153,190 Z" fill="url(#hairGrad)" class="anim-hair-left" />
+                                <path d="M252,140 Q265,180 258,220 Q250,225 247,190 Z" fill="url(#hairGrad)" class="anim-hair-right" />
+
+                                <!-- ナース風ヘアアクセサリー（ピンクのリボンピン） -->
+                                <g transform="translate(232, 118) rotate(15)">
+                                    <rect x="-8" y="-4" width="16" height="8" rx="2" fill="#fb7185" />
+                                    <circle cx="0" cy="0" r="3" fill="#ffffff" />
+                                </g>
+                            </g>
+                        </g> <!-- End Head Group -->
+
+                    </g> <!-- End Whole Body -->
+
+                    <!-- セリフ吹き出し (SVG上部) -->
+                    <g id="speechBubble" transform="translate(190, 25)" filter="url(#softShadow)">
+                        <path d="M -130,0 L 130,0 C 140,0 145,5 145,15 L 145,55 C 145,65 140,70 130,70 L 10,70 L 0,82 L -10,70 L -130,70 C -140,70 -145,65 -145,55 L -145,15 C -145,5 -140,0 -130,0 Z" fill="#ffffff" stroke="#fecdd3" stroke-width="2" />
+                        <text id="bubbleText" x="0" y="38" font-size="14" font-weight="bold" fill="#e11d48" text-anchor="middle">
+                            気分はどうですか？無理しないでね！
+                        </text>
+                    </g>
+                </svg>
+            </div>
+            
+            <!-- SVGアクションボタン（ダウンロード／コピー） -->
+            <div class="mt-4 flex space-x-3 w-full max-w-[420px]">
+                <button onclick="downloadSVG()" class="flex-1 py-2.5 px-4 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 font-semibold text-sm rounded-xl shadow-sm transition flex items-center justify-center space-x-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    <span>SVGを保存</span>
+                </button>
+                <button onclick="copySVGCode()" class="flex-1 py-2.5 px-4 bg-rose-500 hover:bg-rose-600 text-white font-semibold text-sm rounded-xl shadow-md transition flex items-center justify-center space-x-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+                    <span>コードをコピー</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 右側：ポーズ・表情・セリフコントロールパネル -->
+        <div class="lg:col-span-6 space-y-6">
+
+            <!-- ポーズ選択 -->
+            <div class="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+                <h2 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+                    <span class="text-lg">🧍‍♀️</span>
+                    <span>ポーズ切り替え</span>
+                </h2>
+                <div class="grid grid-cols-3 gap-2 md:gap-3">
+                    <button onclick="changePose('default')" id="btnPoseDefault" class="pose-btn p-3 rounded-xl border border-rose-500 bg-rose-50 text-rose-700 font-bold text-xs md:text-sm text-center transition flex flex-col items-center space-y-1">
+                        <span class="text-xl">📋</span>
+                        <span>カルテ確認</span>
+                    </button>
+                    <button onclick="changePose('wave')" id="btnPoseWave" class="pose-btn p-3 rounded-xl border border-slate-200 hover:border-rose-300 text-slate-600 font-medium text-xs md:text-sm text-center transition flex flex-col items-center space-y-1">
+                        <span class="text-xl">👋</span>
+                        <span>手を振る</span>
+                    </button>
+                    <button onclick="changePose('thermometer')" id="btnPoseThermo" class="pose-btn p-3 rounded-xl border border-slate-200 hover:border-rose-300 text-slate-600 font-medium text-xs md:text-sm text-center transition flex flex-col items-center space-y-1">
+                        <span class="text-xl">🌡️</span>
+                        <span>体温チェック</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 表情選択 -->
+            <div class="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+                <h2 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+                    <span class="text-lg">😊</span>
+                    <span>表情コントロール</span>
+                </h2>
+                <div class="grid grid-cols-3 gap-2 md:gap-3">
+                    <button onclick="changeExpression('normal')" id="btnExpNormal" class="exp-btn p-2.5 rounded-xl border border-rose-500 bg-rose-50 text-rose-700 font-bold text-xs md:text-sm text-center transition">
+                        笑顔 (ぱっちり)
+                    </button>
+                    <button onclick="changeExpression('wink')" id="btnExpWink" class="exp-btn p-2.5 rounded-xl border border-slate-200 hover:border-rose-300 text-slate-600 font-medium text-xs md:text-sm text-center transition">
+                        ウィンク 😉
+                    </button>
+                    <button onclick="changeExpression('worried')" id="btnExpWorried" class="exp-btn p-2.5 rounded-xl border border-slate-200 hover:border-rose-300 text-slate-600 font-medium text-xs md:text-sm text-center transition">
+                        心配・寄り添い 🥺
+                    </button>
+                </div>
+            </div>
+
+            <!-- セリフ変更 & プリセット -->
+            <div class="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                <h2 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+                    <span class="text-lg">💬</span>
+                    <span>セリフのカスタマイズ</span>
+                </h2>
+                <div>
+                    <input type="text" id="customTextInput" placeholder="メッセージを入力してください..." value="気分はどうですか？無理しないでね！" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition" oninput="updateBubbleText(this.value)">
+                </div>
+
+                <!-- プリセットメッセージ -->
+                <div class="space-y-1.5">
+                    <span class="text-xs font-semibold text-slate-400">クイック選択:</span>
+                    <div class="flex flex-wrap gap-2">
+                        <button onclick="setPresetText('気分はどうですか？無理しないでね！', 'default', 'normal')" class="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-medium rounded-lg transition">
+                            保健室へようこそ🌸
+                        </button>
+                        <button onclick="setPresetText('熱を測ってみましょうか？', 'thermometer', 'normal')" class="px-3 py-1.5 bg-sky-50 hover:bg-sky-100 text-sky-700 text-xs font-medium rounded-lg transition">
+                            体温測定 🌡️
+                        </button>
+                        <button onclick="setPresetText('大丈夫ですよ、ここで休んでいってね。', 'default', 'worried')" class="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-medium rounded-lg transition">
+                            心配・休養 🍵
+                        </button>
+                        <button onclick="setPresetText('今日も一日、元気に頑張りましょう！', 'wave', 'wink')" class="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-medium rounded-lg transition">
+                            応援・笑顔 ✨
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 服装・髪色カラーテーマ -->
+            <div class="bg-white p-5 md:p-6 rounded-2xl border border-slate-100 shadow-sm space-y-3">
+                <h2 class="text-base font-bold text-slate-800 flex items-center space-x-2">
+                    <span class="text-lg">🎨</span>
+                    <span>インナーカラー変更</span>
+                </h2>
+                <div class="flex items-center space-x-3">
+                    <button onclick="changeInnerColor('#fb7185', '#f43f5e')" class="w-8 h-8 rounded-full bg-rose-500 ring-2 ring-offset-2 ring-rose-400 focus:outline-none transition transform hover:scale-110"></button>
+                    <button onclick="changeInnerColor('#38bdf8', '#0284c7')" class="w-8 h-8 rounded-full bg-sky-400 focus:outline-none transition transform hover:scale-110"></button>
+                    <button onclick="changeInnerColor('#34d399', '#059669')" class="w-8 h-8 rounded-full bg-emerald-400 focus:outline-none transition transform hover:scale-110"></button>
+                    <button onclick="changeInnerColor('#a78bfa', '#7c3aed')" class="w-8 h-8 rounded-full bg-violet-400 focus:outline-none transition transform hover:scale-110"></button>
+                    <button onclick="changeInnerColor('#fbbf24', '#d97706')" class="w-8 h-8 rounded-full bg-amber-400 focus:outline-none transition transform hover:scale-110"></button>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- コピー完了トースト通知 -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-medium opacity-0 pointer-events-none transition-all duration-300 transform translate-y-2 flex items-center space-x-2">
+        <span>✨</span>
+        <span id="toastMsg">SVGコードをクリップボードにコピーしました！</span>
+    </div>
+
+    <!-- フッター -->
+    <footer class="bg-white border-t border-slate-100 py-4 text-center text-xs text-slate-400 mt-8">
+        保健室の先生 全身SVGイラスト - 動的アニメーション対応
+    </footer>
+
+    <script>
+        // アニメーション再生/停止フラグ
+        let isAnimated = true;
+
+        // アニメーション切り替え
+        function toggleAnimation() {
+            const container = document.getElementById('nurseSvg');
+            const btnText = document.getElementById('animText');
+            const btnIcon = document.getElementById('animIcon');
+            
+            isAnimated = !isAnimated;
+            if (isAnimated) {
+                container.classList.remove('paused');
+                btnText.textContent = 'アニメーション停止';
+                btnIcon.textContent = '⏸️';
+            } else {
+                container.classList.add('paused');
+                btnText.textContent = 'アニメーション再生';
+                btnIcon.textContent = '▶️';
+            }
+        }
+
+        // ポーズ変更関数
+        function changePose(pose) {
+            // 全ポーズを隠す
+            document.getElementById('poseDefault').classList.add('hidden');
+            document.getElementById('poseWave').classList.add('hidden');
+            document.getElementById('poseThermometer').classList.add('hidden');
+
+            // ポーズボタンのスタイル初期化
+            document.querySelectorAll('.pose-btn').forEach(btn => {
+                btn.classList.remove('border-rose-500', 'bg-rose-50', 'text-rose-700', 'font-bold');
+                btn.classList.add('border-slate-200', 'text-slate-600', 'font-medium');
+            });
+
+            // 対象ポーズの表示とボタンのアクティブ化
+            if (pose === 'default') {
+                document.getElementById('poseDefault').classList.remove('hidden');
+                activePoseBtn('btnPoseDefault');
+            } else if (pose === 'wave') {
+                document.getElementById('poseWave').classList.remove('hidden');
+                activePoseBtn('btnPoseWave');
+            } else if (pose === 'thermometer') {
+                document.getElementById('poseThermometer').classList.remove('hidden');
+                activePoseBtn('btnPoseThermo');
+            }
+        }
+
+        function activePoseBtn(btnId) {
+            const btn = document.getElementById(btnId);
+            btn.classList.add('border-rose-500', 'bg-rose-50', 'text-rose-700', 'font-bold');
+            btn.classList.remove('border-slate-200', 'text-slate-600', 'font-medium');
+        }
+
+        // 表情変更関数
+        function changeExpression(exp) {
+            // 全目を隠す
+            document.getElementById('eyeNormal').classList.add('hidden');
+            document.getElementById('eyeWink').classList.add('hidden');
+            document.getElementById('eyeWorried').classList.add('hidden');
+
+            // 口の隠し
+            document.getElementById('mouthSmile').classList.add('hidden');
+            document.getElementById('mouthGentle').classList.add('hidden');
+            document.getElementById('mouthOpen').classList.add('hidden');
+
+            // 眉毛初期化
+            const browLeft = document.getElementById('browLeft');
+            const browRight = document.getElementById('browRight');
+            browLeft.setAttribute('d', 'M162,148 Q175,142 186,146');
+            browRight.setAttribute('d', 'M214,146 Q225,142 238,148');
+
+            // 表情ボタンのスタイル初期化
+            document.querySelectorAll('.exp-btn').forEach(btn => {
+                btn.classList.remove('border-rose-500', 'bg-rose-50', 'text-rose-700', 'font-bold');
+                btn.classList.add('border-slate-200', 'text-slate-600', 'font-medium');
+            });
+
+            if (exp === 'normal') {
+                document.getElementById('eyeNormal').classList.remove('hidden');
+                document.getElementById('mouthSmile').classList.remove('hidden');
+                activeExpBtn('btnExpNormal');
+            } else if (exp === 'wink') {
+                document.getElementById('eyeWink').classList.remove('hidden');
+                document.getElementById('mouthGentle').classList.remove('hidden');
+                activeExpBtn('btnExpWink');
+            } else if (exp === 'worried') {
+                document.getElementById('eyeWorried').classList.remove('hidden');
+                document.getElementById('mouthOpen').classList.remove('hidden');
+                // 困り眉に変形
+                browLeft.setAttribute('d', 'M162,142 Q175,146 186,150');
+                browRight.setAttribute('d', 'M214,150 Q225,146 238,142');
+                activeExpBtn('btnExpWorried');
+            }
+        }
+
+        function activeExpBtn(btnId) {
+            const btn = document.getElementById(btnId);
+            btn.classList.add('border-rose-500', 'bg-rose-50', 'text-rose-700', 'font-bold');
+            btn.classList.remove('border-slate-200', 'text-slate-600', 'font-medium');
+        }
+
+        // セリフテキストの更新
+        function updateBubbleText(text) {
+            const bubbleText = document.getElementById('bubbleText');
+            bubbleText.textContent = text || '...';
+        }
+
+        // プリセット設定
+        function setPresetText(text, pose, exp) {
+            document.getElementById('customTextInput').value = text;
+            updateBubbleText(text);
+            changePose(pose);
+            changeExpression(exp);
+        }
+
+        // インナーカラー変更
+        function changeInnerColor(stop1, stop2) {
+            const innerGrad = document.getElementById('innerGrad');
+            innerGrad.children[0].setAttribute('stop-color', stop1);
+            innerGrad.children[1].setAttribute('stop-color', stop2);
+        }
+
+        // トースト表示
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').textContent = msg;
+            toast.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-2');
+            
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'pointer-events-none', 'translate-y-2');
+            }, 3000);
+        }
+
+        // SVGコードコピー機能
+        function copySVGCode() {
+            const svgElement = document.getElementById('nurseSvg').cloneNode(true);
+            // 不要なクラスや非表示要素のクリーンアップを行わずそのままテキスト変換
+            const serializer = new XMLSerializer();
+            let svgString = serializer.serializeToString(svgElement);
+
+            // クリップボードへコピー
+            const dummyTextArea = document.createElement('textarea');
+            dummyTextArea.value = svgString;
+            document.body.appendChild(dummyTextArea);
+            dummyTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(dummyTextArea);
+
+            showToast('SVGコードをクリップボードにコピーしました！');
+        }
+
+        // SVGダウンロード機能
+        function downloadSVG() {
+            const svgElement = document.getElementById('nurseSvg');
+            const serializer = new XMLSerializer();
+            const svgString = serializer.serializeToString(svgElement);
+            
+            const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'nurse_full_body.svg';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            showToast('SVGファイルのダウンロードを開始しました！');
+        }
+    </script>
+</body>
+</html>

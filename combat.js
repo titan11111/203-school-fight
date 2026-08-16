@@ -24,13 +24,20 @@
 
     /** 円×円。中心 (px,py) 半径 pr と敵中心 (ex,ey) 半径 er */
     function circleHitsCircle(px, py, pr, ex, ey, er) {
-        return Math.hypot(ex - px, ey - py) < er + pr;
+        return Math.hypot(ex - px, ey - py) <= er + pr;
     }
 
-    /** 向き付きビーム（中心 p.x,p.y・長さ beamLen・幅 beamWidth）× 敵円 */
+    /** 円 × 軸平行矩形（見た目スプライト） */
+    function circleHitsRect(px, py, pr, rect) {
+        const cx = Math.max(rect.x, Math.min(px, rect.x + rect.w));
+        const cy = Math.max(rect.y, Math.min(py, rect.y + rect.h));
+        return Math.hypot(px - cx, py - cy) <= pr;
+    }
+
+    /** 向き付きビーム（手元から前向き）× 円 */
     function beamHitsCircle(p, ex, ey, er) {
         const len = p.beamLen || 56;
-        const halfW = (p.beamWidth != null ? p.beamWidth : 20) / 2;
+        const halfW = (p.beamWidth != null ? p.beamWidth : 32) / 2;
         const ang = facingAngle(p.facing);
         const cos = Math.cos(ang);
         const sin = Math.sin(ang);
@@ -38,21 +45,96 @@
         const dy = ey - p.y;
         const localX = dx * cos + dy * sin;
         const localY = -dx * sin + dy * cos;
-        const halfLen = len / 2;
-        if (localX < -halfLen - er || localX > halfLen + er) return false;
+        if (localX < -er || localX > len + er) return false;
         return Math.abs(localY) <= halfW + er;
     }
 
-    function projectileHitsEnemy(p, enemy) {
-        if (p.kind === 'saber' || p.hitShape === 'beam') {
-            return beamHitsCircle(p, enemy.x, enemy.y, enemy.radius);
+    /** ビーム矩形 × スプライト矩形。角をビーム座標へ回して重なりを見る */
+    function beamHitsRect(p, rect) {
+        const len = p.beamLen || 56;
+        const halfW = (p.beamWidth != null ? p.beamWidth : 32) / 2;
+        const ang = facingAngle(p.facing);
+        const cos = Math.cos(ang);
+        const sin = Math.sin(ang);
+        const corners = [
+            [rect.x, rect.y],
+            [rect.x + rect.w, rect.y],
+            [rect.x, rect.y + rect.h],
+            [rect.x + rect.w, rect.y + rect.h]
+        ];
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+        for (let i = 0; i < 4; i++) {
+            const dx = corners[i][0] - p.x;
+            const dy = corners[i][1] - p.y;
+            const lx = dx * cos + dy * sin;
+            const ly = -dx * sin + dy * cos;
+            if (lx < minX) minX = lx;
+            if (lx > maxX) maxX = lx;
+            if (ly < minY) minY = ly;
+            if (ly > maxY) maxY = ly;
         }
-        return circleHitsCircle(p.x, p.y, p.radius, enemy.x, enemy.y, enemy.radius);
+        if (maxX < 0 || minX > len) return false;
+        return !(maxY < -halfW || minY > halfW);
+    }
+
+    /**
+     * 見た目のスプライト箱。足元原点、上方向へ hurtH、左右 hurtW。
+     * 弾・斬撃がこの箱に重なったらダメージ（絵で当たったら判定）。
+     */
+    function spriteBox(entity) {
+        const w = entity.hurtW || Math.max(48, (entity.radius || 20) * 2.2);
+        const h = entity.hurtH || Math.max(72, (entity.radius || 20) * 3.2);
+        return { x: entity.x - w / 2, y: entity.y - h, w, h };
+    }
+
+    function enemyHurtbox(enemy) {
+        const box = spriteBox(enemy);
+        return {
+            x: box.x + box.w / 2,
+            y: box.y + box.h / 2,
+            radius: Math.max(box.w, box.h) / 2,
+            box
+        };
+    }
+
+    function projectileHitsRect(p, rect) {
+        if (p.kind === 'saber' || p.hitShape === 'beam') return beamHitsRect(p, rect);
+        return circleHitsRect(p.x, p.y, p.radius || 10, rect);
+    }
+
+    function projectileHitsEnemy(p, enemy) {
+        return projectileHitsRect(p, spriteBox(enemy));
+    }
+
+    function projectileHitsPlayer(p, player) {
+        return projectileHitsRect(p, spriteBox(player));
+    }
+
+    function rectsOverlap(a, b) {
+        return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    }
+
+    function bodiesOverlap(a, b, pad) {
+        pad = pad || 0;
+        const A = spriteBox(a);
+        const B = spriteBox(b);
+        A.x -= pad;
+        A.y -= pad;
+        A.w += pad * 2;
+        A.h += pad * 2;
+        B.x -= pad;
+        B.y -= pad;
+        B.w += pad * 2;
+        B.h += pad * 2;
+        return rectsOverlap(A, B);
     }
 
     /**
      * 武器ごとの当たり判定定義（表示・コードの正本）。
-     * 座標はすべてワールド px。敵は円 (enemy.x, enemy.y, enemy.radius)。
+     * 座標はすべてワールド px。被弾は見た目スプライト箱 spriteBox（足元原点・hurtW×hurtH）。
      */
     const HIT_PROFILES = {
         yoyo: {
@@ -62,7 +144,7 @@
                 origin: 'muzzle(yoyo) + 20px 向き方向',
                 motion: 'out: 9px/frame → life45%で return → 手元へ 11px/frame',
                 multiHit: '1投射体あたり敵1体1回（hitIds）。往路・復路は別投射体',
-                onHit: 'phase=out なら即 return'
+                onHit: 'ダメージ＋ノックバック。phase=out なら即 return'
             },
             skill: {
                 shape: 'circle',
@@ -79,7 +161,8 @@
                 radiusByCombo: [11, 13, 15],
                 origin: 'muzzle(flute)+28px（口元+11px下）',
                 motion: '7+combo px/frame 直進、life 42F',
-                multiHit: '1音符あたり敵1体1回'
+                multiHit: '1音符あたり敵1体1回。命中で消滅',
+                onHit: 'ダメージ＋弾の進行方向へノックバック'
             },
             skill: {
                 shape: 'circle',
@@ -87,26 +170,29 @@
                 count: 8,
                 origin: '口元 muzzle(flute)',
                 motion: '全方向 6.5px/frame、life 36F',
-                multiHit: '1音符あたり敵1体1回'
+                multiHit: '1音符あたり敵1体1回。命中で消滅',
+                onHit: 'ダメージ＋放射方向へノックバック'
             }
         },
         saber: {
             normal: {
                 shape: 'beam',
-                beamLenByCombo: [56, 66, 76],
-                beamWidth: 20,
-                origin: 'muzzle(saber)+22px から reach×0.45 先',
-                motion: '3px/frame 向き方向、life 11F',
+                beamLenByCombo: [64, 76, 88],
+                beamWidth: 32,
+                origin: 'muzzle(saber)+8px。手元から前向きに伸びる',
+                motion: 'その場に12F。中心基準ではなく刃先方向へ判定',
                 multiHit: '1斬撃あたり敵1体1回',
-                note: '判定は矩形ビーム。旧実装の円 radius は使わない'
+                onHit: 'ダメージ＋向き方向へノックバック',
+                note: '判定は手元起点の矩形ビーム。旧実装の円 radius は使わない'
             },
             skill: {
                 shape: 'beam',
-                beamLen: 92,
-                beamWidth: 20,
-                origin: 'muzzle(saber) + 36px 向き方向',
-                motion: '14px/frame、life 22F',
-                multiHit: '1斬撃あたり敵1体1回'
+                beamLen: 96,
+                beamWidth: 36,
+                origin: 'muzzle(saber) + 12px 向き方向',
+                motion: '14px/frame、life 22F。手元から前向きに伸びたまま飛ぶ',
+                multiHit: '1斬撃あたり敵1体1回',
+                onHit: 'ダメージ＋向き方向へノックバック'
             }
         }
     };
@@ -192,14 +278,14 @@
             return w;
         }
         if (w.id === 'saber') {
-            const shot = muzzle(player, 22, 'saber');
-            const reach = 46 + comboStep * 10;
+            const shot = muzzle(player, 8, 'saber');
+            const reach = 52 + comboStep * 12;
             projectiles.spawn({
-                x: shot.x + dir.x * reach * 0.45,
-                y: shot.y + dir.y * reach * 0.45,
-                vx: dir.x * 3,
-                vy: dir.y * 3,
-                life: 11,
+                x: shot.x,
+                y: shot.y,
+                vx: 0,
+                vy: 0,
+                life: 12,
                 kind: 'saber',
                 hitShape: 'beam',
                 radius: 0,
@@ -208,7 +294,10 @@
                 owner: 'player',
                 facing: player.facing,
                 beamLen: reach,
-                beamWidth: 20
+                beamWidth: 32,
+                kbX: dir.x,
+                kbY: dir.y,
+                followMuzzle: true
             });
             return w;
         }
@@ -257,8 +346,8 @@
         if (w.id === 'saber') {
             const dir = facingVec(player.facing);
             projectiles.spawn({
-                x: origin.x + dir.x * 36,
-                y: origin.y + dir.y * 36,
+                x: origin.x + dir.x * 12,
+                y: origin.y + dir.y * 12,
                 vx: dir.x * 14,
                 vy: dir.y * 14,
                 life: 22,
@@ -269,8 +358,10 @@
                 poise: 26,
                 owner: 'player',
                 facing: player.facing,
-                beamLen: 92,
-                beamWidth: 20
+                beamLen: 96,
+                beamWidth: 36,
+                kbX: dir.x,
+                kbY: dir.y
             });
             return origin;
         }
@@ -449,6 +540,9 @@
             p.beamLen = data.beamLen || 0;
             p.beamWidth = data.beamWidth || 0;
             p.hitShape = data.hitShape || '';
+            p.kbX = data.kbX != null ? data.kbX : p.vx;
+            p.kbY = data.kbY != null ? data.kbY : p.vy;
+            p.followMuzzle = !!data.followMuzzle;
             p.hitIds = null;
             this.live.push(p);
             if (this.live.length > this.limit) {
@@ -458,7 +552,7 @@
             return p;
         }
 
-        update(player, enemies, onHitEnemy, onHitPlayer) {
+        update(player, enemies, onHitEnemy, onHitPlayer, onHitWorld) {
             for (let i = this.live.length - 1; i >= 0; i--) {
                 const p = this.live[i];
                 const hand = muzzle(player, 0, 'yoyo');
@@ -466,7 +560,12 @@
                     p.homeX = hand.x;
                     p.homeY = hand.y;
                 }
-                if (p.kind === 'yoyo' && p.phase === 'return') {
+                if (p.followMuzzle) {
+                    const hold = muzzle(player, 8, p.kind === 'saber' ? 'saber' : p.kind);
+                    p.x = hold.x;
+                    p.y = hold.y;
+                    p.facing = player.facing;
+                } else if (p.kind === 'yoyo' && p.phase === 'return') {
                     const dx = hand.x - p.x;
                     const dy = hand.y - p.y;
                     const d = Math.hypot(dx, dy) || 1;
@@ -500,13 +599,15 @@
                                 p.hitIds[key] = 1;
                                 onHitEnemy(enemy, p);
                                 if (p.kind === 'yoyo' && p.phase === 'out') p.phase = 'return';
+                                if (p.kind === 'note') p.life = 0;
                             }
                         }
                     }
                 } else if (onHitPlayer) {
-                    const dist = Math.hypot(player.x - p.x, player.y - p.y);
-                    if (dist < player.radius + p.radius) onHitPlayer(p);
+                    if (projectileHitsPlayer(p, player)) onHitPlayer(p);
                 }
+
+                if (onHitWorld && p.owner === 'player') onHitWorld(p);
 
                 if (p.life <= 0) {
                     this.live.splice(i, 1);
@@ -537,16 +638,17 @@
                     ctx.fillRect(-3, -3, 6, 6);
                 } else if (p.kind === 'saber') {
                     const ang = p.facing === 'left' ? Math.PI : p.facing === 'up' ? -Math.PI / 2 : p.facing === 'down' ? Math.PI / 2 : 0;
-                    const len = p.beamLen || 56;
+                    const len = p.beamLen || 64;
+                    const bw = p.beamWidth || 32;
                     ctx.rotate(ang);
                     ctx.fillStyle = 'rgba(52, 211, 153, 0.28)';
-                    ctx.fillRect(((-len / 2) | 0), -10, len | 0, 20);
+                    ctx.fillRect(0, ((-bw / 2) | 0), len | 0, bw | 0);
                     ctx.fillStyle = '#6ee7b7';
-                    ctx.fillRect(((-len / 2) | 0), -5, len | 0, 10);
+                    ctx.fillRect(0, -6, len | 0, 12);
                     ctx.fillStyle = '#ecfdf5';
-                    ctx.fillRect(((-len / 2) | 0), -2, len | 0, 4);
+                    ctx.fillRect(0, -2, len | 0, 4);
                     ctx.fillStyle = '#334155';
-                    ctx.fillRect(((-len / 2) | 0) - 6, -4, 10, 8);
+                    ctx.fillRect(-8, -5, 12, 10);
                 } else if (p.kind === 'note') {
                     ctx.fillStyle = p.note % 2 ? '#c084fc' : '#67e8f9';
                     ctx.beginPath();
@@ -584,9 +686,9 @@
                     ctx.strokeStyle = 'rgba(250, 204, 21, 0.85)';
                     ctx.lineWidth = 1.5;
                     if (p.kind === 'saber' || p.hitShape === 'beam') {
-                        const len = p.beamLen || 56;
-                        const bw = p.beamWidth || 20;
-                        ctx.strokeRect((-len / 2) | 0, (-bw / 2) | 0, len | 0, bw | 0);
+                        const len = p.beamLen || 64;
+                        const bw = p.beamWidth || 32;
+                        ctx.strokeRect(0, (-bw / 2) | 0, len | 0, bw | 0);
                     } else if (p.radius > 0) {
                         ctx.beginPath();
                         ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
@@ -618,6 +720,27 @@
                     shake: 0
                 });
             });
+        }
+
+        hitByProjectile(p, onBreak) {
+            let hit = false;
+            for (let i = 0; i < this.items.length; i++) {
+                const d = this.items[i];
+                if (!d.alive || d.area !== (global.GameState && global.GameState.currentArea)) continue;
+                if (!projectileHitsRect(p, { x: d.x, y: d.y, w: d.w, h: d.h })) continue;
+                const key = 'b' + i;
+                p.hitIds = p.hitIds || Object.create(null);
+                if (p.hitIds[key]) continue;
+                p.hitIds[key] = 1;
+                d.hp -= p.damage || 10;
+                d.shake = 8;
+                hit = true;
+                if (d.hp <= 0) {
+                    d.alive = false;
+                    if (onBreak) onBreak(d);
+                }
+            }
+            return hit;
         }
 
         hitAt(x, y, radius, damage, onBreak) {
@@ -695,7 +818,14 @@
         fireAttack,
         fireSkill,
         projectileHitsEnemy,
+        projectileHitsPlayer,
+        projectileHitsRect,
+        enemyHurtbox,
+        spriteBox,
+        bodiesOverlap,
         circleHitsCircle,
-        beamHitsCircle
+        circleHitsRect,
+        beamHitsCircle,
+        beamHitsRect
     };
 })(window);

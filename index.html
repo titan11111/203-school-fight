@@ -1463,6 +1463,8 @@
                 this.x = WORLD_WIDTH / 2;
                 this.y = WORLD_HEIGHT / 2 + 100;
                 this.radius = 22;
+                this.hurtW = 52;
+                this.hurtH = HERO_VISUAL_H;
                 this.speed = PLAYER_WALK_SPEED * (isMobilePlay() ? PLAYER_MOBILE_SPEED_MULT : 1);
                 this.vx = 0;
                 this.vy = 0;
@@ -1760,6 +1762,15 @@
                 }
 
                 ctx.restore();
+
+                if (GameState.debugHitboxes) {
+                    const box = CombatKit.spriteBox(this);
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(52, 211, 153, 0.95)';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(box.x | 0, box.y | 0, box.w | 0, box.h | 0);
+                    ctx.restore();
+                }
             }
         }
 
@@ -2236,18 +2247,27 @@
         ]);
 
         function onPlayerProjectileHit(enemy, proj) {
-            enemy.takeDamage(proj.damage, player.x, player.y, { poise: proj.poise, pull: proj.pull });
-            vfxManager.addSlash(enemy.x, enemy.y, player.facing, 2);
-            breakables.hitAt(proj.x, proj.y, 24, proj.damage, (d) => {
-                vfxManager.addExplosion(d.x, d.y);
-                GameState.money += 5;
-                comboRank.registerHit(1);
+            enemy.takeDamage(proj.damage, player.x, player.y, {
+                poise: proj.poise,
+                pull: proj.pull,
+                kbX: proj.kbX != null ? proj.kbX : proj.vx,
+                kbY: proj.kbY != null ? proj.kbY : proj.vy
             });
+            vfxManager.addSlash(enemy.x, enemy.y, player.facing, 2);
+            audio.playHit();
         }
 
         function onEnemyProjectileHit(proj) {
             player.takeDamage(Math.max(8, (proj.damage || 12) - 2));
             proj.life = 0;
+        }
+
+        function onPlayerWorldHit(proj) {
+            breakables.hitByProjectile(proj, (d) => {
+                vfxManager.addExplosion(d.x, d.y);
+                GameState.money += 5;
+                comboRank.registerHit(1);
+            });
         }
 
         // -------------------------------------------------------------
@@ -3635,7 +3655,7 @@
                     player.update(keys);
                     mapNpcs.forEach((mob) => mob.update());
                     enemies.forEach(e => e.update(player));
-                    projectiles.update(player, enemies, onPlayerProjectileHit, onEnemyProjectileHit);
+                    projectiles.update(player, enemies, onPlayerProjectileHit, onEnemyProjectileHit, onPlayerWorldHit);
                     breakables.update();
                     comboRank.update();
                     checkPortalsAndInteractions();
