@@ -107,6 +107,16 @@
             background: #0b1220;
             border-top: 2px solid rgba(244, 114, 182, 0.35);
             z-index: 30;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: none;
+        }
+        #virtual-controls * {
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            touch-action: none;
         }
         .dpad {
             --pad: min(42vw, calc(25vh - 12px), 168px);
@@ -129,17 +139,26 @@
             min-width: 48px;
             min-height: 48px;
             background: #1e293b;
-            color: #fff;
+            color: transparent;
+            font-size: 0;
             border: 2px solid #64748b;
             border-radius: 12px;
-            font-size: 18px;
             font-weight: 900;
             display: flex;
             align-items: center;
             justify-content: center;
-            touch-action: manipulation;
+            touch-action: none;
             transition: transform 0.05s ease, opacity 0.05s ease, filter 0.05s ease, box-shadow 0.05s ease;
             box-shadow: 0 4px 0 #0f172a;
+        }
+        .dpad button::after {
+            content: attr(data-glyph);
+            font-size: 18px;
+            color: #fff;
+            line-height: 1;
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-select: none;
         }
         .dpad button:active,
         .dpad button.is-pressed {
@@ -179,8 +198,13 @@
             cursor: pointer;
             transition: transform 0.05s ease, opacity 0.05s ease, filter 0.05s ease, box-shadow 0.05s ease;
             will-change: transform;
-            touch-action: manipulation;
+            touch-action: none;
             box-shadow: 0 5px 0 rgba(0, 0, 0, 0.45);
+        }
+        .btn-action * {
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-select: none;
         }
         .btn-action:active, .btn-action.is-pressed {
             transform: scale(0.88) translateY(4px);
@@ -219,7 +243,7 @@
         .use-btn, #dialog-next-btn, #close-inventory-btn, #close-features-btn, #start-btn {
             -webkit-user-select: none;
             -webkit-touch-callout: none;
-            touch-action: manipulation;
+            touch-action: none;
             cursor: pointer;
             transition: transform 0.05s ease, filter 0.05s ease;
         }
@@ -479,10 +503,10 @@
     <div id="virtual-controls">
         <div class="dpad" id="mobile-dpad">
             <div class="dpad-base"></div>
-            <button type="button" id="dpad-up" aria-label="上">▲</button>
-            <button type="button" id="dpad-left" aria-label="左">◀</button>
-            <button type="button" id="dpad-right" aria-label="右">▶</button>
-            <button type="button" id="dpad-down" aria-label="下">▼</button>
+            <button type="button" id="dpad-up" aria-label="上" data-glyph="▲"></button>
+            <button type="button" id="dpad-left" aria-label="左" data-glyph="◀"></button>
+            <button type="button" id="dpad-right" aria-label="右" data-glyph="▶"></button>
+            <button type="button" id="dpad-down" aria-label="下" data-glyph="▼"></button>
         </div>
         <div class="ctrl-quest">
             <div class="text-[10px] font-extrabold text-pink-400">目的</div>
@@ -583,7 +607,7 @@
             audioInitialized: false,
             skeletalReady: false,
             weapon: 'yoyo',
-            ownedWeapons: ['yoyo'],
+            ownedWeapons: ['yoyo', 'flute'],
             hasSaber: false,
             bossPhase: 1,
             minigame: null,
@@ -1023,6 +1047,7 @@
         const WORLD_HEIGHT = 1200;
         const PLAYER_WALK_SPEED = 5.85; // 4.5 × 1.3
         const PLAYER_MOBILE_SPEED_MULT = 1.2;
+        const ATTACK_MOTION_SPEED = 1.5;
         function isMobilePlay() {
             return window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 768;
         }
@@ -1480,7 +1505,7 @@
             }
 
             cycleWeapon() {
-                const list = GameState.ownedWeapons || ['yoyo'];
+                const list = GameState.ownedWeapons || ['yoyo', 'flute'];
                 if (list.length < 2) {
                     showNotification('まだ武器は一つ');
                     return;
@@ -1570,7 +1595,10 @@
 
                 // フレーム更新（アニメーション）
                 this.frameTimer++;
-                if (this.frameTimer >= this.frameSpeed) {
+                const animFrameSpeed = this.isAttacking
+                    ? Math.max(1, this.frameSpeed / ATTACK_MOTION_SPEED)
+                    : this.frameSpeed;
+                if (this.frameTimer >= animFrameSpeed) {
                     this.frameTimer = 0;
                     this.frameIndex++;
                 }
@@ -1581,7 +1609,7 @@
                 const w = CombatKit.weaponOf(GameState.weapon);
                 this.isAttacking = true;
                 this.comboStep = (this.comboStep % 3) + 1;
-                this.attackTimer = w.attackFrames;
+                this.attackTimer = Math.max(1, Math.round(w.attackFrames / ATTACK_MOTION_SPEED));
                 this.animationState = w.attackAnim(this.comboStep);
                 audio.playWeapon(w.sfx);
                 CombatKit.fireAttack(w.id, this, projectiles, this.comboStep);
@@ -1637,7 +1665,7 @@
                 }
                 this.sp -= w.skillCost;
                 this.isAttacking = true;
-                this.attackTimer = w.skillFrames;
+                this.attackTimer = Math.max(1, Math.round(w.skillFrames / ATTACK_MOTION_SPEED));
                 this.animationState = w.skillAnim;
                 updateHUD();
                 audio.playWeapon(w.sfx);
@@ -2592,6 +2620,20 @@
             audio.resumeBgm();
         });
         document.addEventListener('keydown', () => audio.init(), { once: true });
+
+        const virtualControls = document.getElementById('virtual-controls');
+        if (virtualControls) {
+            const blockControlSelection = (e) => {
+                e.preventDefault();
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount) sel.removeAllRanges();
+            };
+            virtualControls.addEventListener('touchstart', blockControlSelection, { passive: false, capture: true });
+            virtualControls.addEventListener('touchmove', blockControlSelection, { passive: false, capture: true });
+            virtualControls.addEventListener('selectstart', (e) => e.preventDefault(), { capture: true });
+            virtualControls.addEventListener('contextmenu', (e) => e.preventDefault(), { capture: true });
+            virtualControls.addEventListener('dragstart', (e) => e.preventDefault(), { capture: true });
+        }
 
         function bindTap(el, handler) {
             if (!el) return;
