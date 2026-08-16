@@ -247,6 +247,11 @@
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('桜ヶ丘中学校', x + w / 2, wallTop + 76);
+
+        fillRect(ctx, doorX + 28, doorY + 98, 72, 16, '#022c22');
+        ctx.fillStyle = '#6ee7b7';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillText('入口', x + w / 2, doorY + 106);
     }
 
     function drawGym(ctx, dec) {
@@ -449,7 +454,8 @@
                 return [
                     { x: dec.x, y: wallTop, w: doorX - dec.x, h: wallH },
                     { x: doorX + doorW, y: wallTop, w: dec.x + dec.w - doorX - doorW, h: wallH },
-                    { x: dec.x + 24, y: dec.y, w: dec.w - 48, h: 36 }
+                    { x: dec.x + 24, y: dec.y, w: dec.w - 48, h: 36 },
+                    { x: doorX, y: wallTop, w: doorW, h: 90 }
                 ];
             }
             case 'school_gym':
@@ -482,8 +488,110 @@
         }
     }
 
+    function drawClassroomDoor(ctx, x, y, w, h, name) {
+        fillRect(ctx, x, y, w, h, '#d6c4a2');
+        fillRect(ctx, x, y, w, 10, '#1f6f7c');
+        fillRect(ctx, x + 18, y + 28, w - 36, h - 48, '#1f4d56');
+        fillRect(ctx, x + 28, y + 40, w - 56, 70, '#67e8f9');
+        fillRect(ctx, x + 28, y + 40, w - 56, 16, '#bae6fd');
+        fillRect(ctx, x + w - 48, y + (h / 2 | 0), 10, 10, '#f8fafc');
+        fillRect(ctx, x + 36, y + 8, w - 72, 22, '#1e293b');
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = 'bold 13px DotGothic16, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(name, x + w / 2, y + 19);
+    }
+
+    function drawShoeLocker(ctx, x, y, w, h) {
+        fillRect(ctx, x, y, w, h, '#7c4a1e');
+        fillRect(ctx, x + 4, y + 4, w - 8, h - 8, '#a16207');
+        const cols = Math.max(4, (w / 44) | 0);
+        const rows = 2;
+        const cellW = ((w - 16) / cols) | 0;
+        const cellH = ((h - 16) / rows) | 0;
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const cx = x + 8 + c * cellW;
+                const cy = y + 8 + r * cellH;
+                fillRect(ctx, cx, cy, cellW - 4, cellH - 4, '#78350f');
+                fillRect(ctx, cx + 4, cy + 4, cellW - 12, cellH - 14, '#92400e');
+                fillRect(ctx, cx + cellW - 14, cy + (cellH / 2 | 0) - 3, 6, 6, '#fbbf24');
+            }
+        }
+    }
+
+    function drawHall(ctx, W, H) {
+        fillRect(ctx, 0, 0, W, H, '#3f3a32');
+        fillRect(ctx, 200, 100, 1200, 992, '#d6c8a8');
+        ctx.fillStyle = '#c4b694';
+        for (let ty = 132; ty < 1080; ty += 36) {
+            ctx.fillRect(232, ty, 1136, 2);
+        }
+        for (let tx = 232; tx < 1368; tx += 48) {
+            ctx.fillRect(tx, 132, 2, 928);
+        }
+
+        fillRect(ctx, 200, 100, 1200, 32, '#efe2c6');
+        fillRect(ctx, 200, 1060, 1200, 32, '#efe2c6');
+        fillRect(ctx, 200, 100, 32, 992, '#efe2c6');
+        fillRect(ctx, 1368, 100, 32, 992, '#efe2c6');
+        fillRect(ctx, 200, 100, 1200, 10, '#1f6f7c');
+
+        ctx.fillStyle = '#fef9c3';
+        for (let i = 0; i < 5; i++) {
+            ctx.fillRect(320 + i * 220, 118, 80, 8);
+        }
+
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 26px DotGothic16, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('北校舎  1F 昇降口', 800, 118);
+
+        drawClassroomDoor(ctx, 260, 160, 220, 200, '職員室');
+        drawClassroomDoor(ctx, 500, 160, 220, 200, '保健室');
+        drawClassroomDoor(ctx, 880, 160, 220, 200, '1年A組');
+        drawClassroomDoor(ctx, 1120, 160, 220, 200, '1年B組');
+
+        fillRect(ctx, 720, 200, 160, 120, '#92400e');
+        fillRect(ctx, 728, 208, 144, 104, '#d6a15c');
+        const notes = ['#fef08a', '#fda4af', '#a5f3fc', '#bbf7d0'];
+        for (let i = 0; i < 4; i++) {
+            fillRect(ctx, 740 + (i % 2) * 56, 220 + ((i / 2) | 0) * 42, 44, 34, notes[i]);
+        }
+        ctx.fillStyle = '#1e293b';
+        ctx.font = 'bold 11px DotGothic16, sans-serif';
+        ctx.fillText('掲示板', 800, 208);
+
+        drawShoeLocker(ctx, 280, 720, 360, 90);
+        drawShoeLocker(ctx, 960, 720, 360, 90);
+        ctx.fillStyle = '#fef3c7';
+        ctx.font = 'bold 12px DotGothic16, sans-serif';
+        ctx.fillText('下駄箱', 460, 768);
+        ctx.fillText('下駄箱', 1140, 768);
+
+        fillRect(ctx, 760, 480, 80, 70, '#64748b');
+        fillRect(ctx, 768, 488, 64, 36, '#38bdf8');
+        fillRect(ctx, 788, 528, 24, 16, '#94a3b8');
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.fillText('水飲み', 800, 506);
+
+        fillRect(ctx, 248, 430, 28, 48, '#15803d');
+        fillRect(ctx, 244, 470, 36, 14, '#57534e');
+        fillRect(ctx, 1324, 430, 28, 48, '#15803d');
+        fillRect(ctx, 1320, 470, 36, 14, '#57534e');
+
+        fillRect(ctx, 740, 1060, 120, 32, '#fed7aa');
+        ctx.fillStyle = '#9a3412';
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillText('出口', 800, 1076);
+    }
+
     global.SchoolMap = {
         drawYard,
+        drawHall,
         draw,
         isGround,
         isProp,

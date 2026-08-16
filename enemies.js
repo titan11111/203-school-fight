@@ -277,7 +277,7 @@
             const anim = this.getAnim();
             if (this.broken > 0) anim.squash = 0.82;
             if (this.teleportFlash > 0) ctx.globalAlpha = this.teleportFlash % 2 ? 0.25 : 0.9;
-            const h = drawCharArt(ctx, this.artKey, this.x, this.y, this.facing, this.flipArt ? true : null, anim);
+            const h = this.drawBody(ctx, anim);
             ctx.globalAlpha = 1;
 
             ctx.save();
@@ -290,6 +290,10 @@
             ctx.fillStyle = '#38bdf8';
             ctx.fillRect((this.x - barWidth / 2) | 0, barY + 6, (barWidth * (this.poise / this.maxPoise)) | 0, 3);
             ctx.restore();
+        }
+
+        drawBody(ctx, anim) {
+            return drawCharArt(ctx, this.artKey, this.x, this.y, this.facing, this.flipArt ? true : null, anim);
         }
     }
 
@@ -445,8 +449,19 @@
             this.sprite = '📖';
             this.poise = this.maxPoise = 72;
             this.telegraphR = 86;
-            this.drawScale = 1.35;
+            this.drawScale = 1.25;
             this.patrolRadius = 70;
+        }
+
+        getAnim() {
+            return { bob: 0, squash: 1, scale: this.drawScale };
+        }
+
+        drawBody(ctx, anim) {
+            if (typeof ParkVectors !== 'undefined' && ParkVectors.drawKinjiro) {
+                return ParkVectors.drawKinjiro(ctx, this, anim);
+            }
+            return super.drawBody(ctx, anim);
         }
     }
 
@@ -466,7 +481,7 @@
             this.phase = 1;
             this.poise = this.maxPoise = 120;
             this.telegraphR = 170;
-            this.drawScale = 4;
+            this.drawScale = 1.85;
             this.teleportTimer = 160;
             this.teleportFlash = 0;
             this.heavyTimer = 70;
@@ -496,6 +511,17 @@
 
         getBreakMessage() {
             return '校長の姿勢が崩れた！';
+        }
+
+        getAnim() {
+            return { bob: 0, squash: 1, scale: this.drawScale };
+        }
+
+        drawBody(ctx, anim) {
+            if (typeof ParkVectors !== 'undefined' && ParkVectors.drawPrincipal) {
+                return ParkVectors.drawPrincipal(ctx, this, anim);
+            }
+            return super.drawBody(ctx, anim);
         }
 
         onAttackFrame(player, dist) {

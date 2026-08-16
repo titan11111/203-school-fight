@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>二宮金次郎 敵キャラベクター＆アニメーションシステム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Noto+Sans+JP:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+        }
+
+        .font-cinzel {
+            font-family: 'Cinzel', serif;
+        }
+
+        /* カスタムスクロールバー */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        .bronze-glow {
+            box-shadow: 0 0 25px rgba(217, 119, 6, 0.25);
+        }
+
+        .canvas-container {
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 1) 100%),
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 20px 20px, 20px 20px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+    <!-- ヘッダー -->
+    <header class="bg-slate-900 border-b border-slate-800 py-4 px-6 flex flex-wrap justify-between items-center gap-4">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-lg bg-amber-700/30 border border-amber-500/50 flex items-center justify-center text-amber-400 text-xl font-bold">
+                <i class="fa-solid fa-person-military-to-person"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-black tracking-wider text-amber-200">銅像・二宮金次郎 <span class="text-xs bg-red-900/80 text-red-300 px-2 py-0.5 rounded border border-red-700 uppercase ml-2">Enemy Unit</span></h1>
+                <p class="text-xs text-slate-400">カクカクモーション＆ローリングアタック ベクターアニメーション</p>
+            </div>
+        </div>
+
+        <!-- タブ切り替えボタン -->
+        <div class="flex bg-slate-800 p-1 rounded-xl border border-slate-700 text-sm font-bold">
+            <button id="tab-viewer" onclick="switchTab('viewer')" class="px-4 py-2 rounded-lg transition-all bg-amber-600 text-white shadow">
+                <i class="fa-solid fa-eye mr-2"></i>リグ＆動作ビューア
+            </button>
+            <button id="tab-game" onclick="switchTab('game')" class="px-4 py-2 rounded-lg transition-all text-slate-400 hover:text-white">
+                <i class="fa-solid fa-gamepad mr-2"></i>プレイテスト環境
+            </button>
+            <button id="tab-code" onclick="switchTab('code')" class="px-4 py-2 rounded-lg transition-all text-slate-400 hover:text-white">
+                <i class="fa-solid fa-code mr-2"></i>組込用コード出力
+            </button>
+        </div>
+    </header>
+
+    <!-- 主コンテンツ領域 -->
+    <main class="flex-1 flex flex-col lg:flex-row p-4 gap-4 overflow-hidden">
+        
+        <!-- VIEW 1: リグ＆動作ビューア -->
+        <div id="view-viewer" class="flex-1 flex flex-col lg:flex-row gap-4 w-full">
+            <!-- キャンバスエリア -->
+            <div class="flex-1 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col items-center justify-center relative overflow-hidden canvas-container min-h-[450px]">
+                <div class="absolute top-4 left-4 flex items-center gap-2 bg-slate-900/80 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-700/50 text-xs text-slate-300">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="current-state-label" class="font-mono uppercase font-bold text-emerald-400">STATE: IDLE</span>
+                </div>
+
+                <div class="absolute top-4 right-4 flex gap-2">
+                    <button onclick="toggleHitbox()" id="btn-hitbox" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-300 transition">
+                        <i class="fa-solid fa-vector-square mr-1"></i> 当たり判定: OFF
+                    </button>
+                </div>
+
+                <!-- メインキャンバス -->
+                <canvas id="viewerCanvas" width="600" height="500" class="max-w-full max-h-full object-contain cursor-grab active:cursor-grabbing"></canvas>
+
+                <!-- 下部簡易ガイド -->
+                <div class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur px-4 py-2 rounded-full border border-slate-700 text-xs text-slate-400 flex items-center gap-4 shadow-xl">
+                    <span><i class="fa-solid fa-mouse mr-1 text-amber-400"></i> カクカク度の調整でコマ落ち感を調整可能</span>
+                </div>
+            </div>
+
+            <!-- コントロールパネル -->
+            <div class="w-full lg:w-96 bg-slate-900 rounded-2xl border border-slate-800 p-5 flex flex-col gap-5 overflow-y-auto max-h-[calc(100vh-120px)]">
+                <h2 class="text-base font-bold text-slate-200 border-b border-slate-800 pb-2 flex items-center">
+                    <i class="fa-solid fa-sliders text-amber-500 mr-2"></i> アクション & 状態コントロール
+                </h2>
+
+                <!-- アクション手動発動 -->
+                <div class="space-y-2">
+                    <label class="text-xs text-slate-400 font-bold uppercase tracking-wider">状態・攻撃テスト</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="setKinjiroState('IDLE')" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-left transition flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-blue-400"></span> 待機 (Idle)
+                        </button>
+                        <button onclick="setKinjiroState('WALK')" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-left transition flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400"></span> カクカク歩行
+                        </button>
+                        <button onclick="triggerRollingAttack()" class="col-span-2 p-3 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-sm shadow-lg shadow-red-900/30 transition transform active:scale-95 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-sync fa-spin"></i> ローリングアタック実行！
+                        </button>
+                        <button onclick="setKinjiroState('DAZED')" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-left transition flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-yellow-400"></span> 目を回す (Dazed)
+                        </button>
+                        <button onclick="setKinjiroState('HURT')" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-left transition flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-purple-400"></span> 被弾 (Hurt)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 銅像のマテリアル/スキン設定 -->
+                <div class="space-y-2">
+                    <label class="text-xs text-slate-400 font-bold uppercase tracking-wider">銅像のマテリアル (Skin)</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="setMaterial('bronze')" id="mat-bronze" class="p-2 rounded-lg border-2 border-amber-500 bg-amber-950/40 text-amber-300 text-xs font-bold text-center">
+                            クラシック銅
+                        </button>
+                        <button onclick="setMaterial('patina')" id="mat-patina" class="p-2 rounded-lg border border-slate-700 bg-emerald-950/40 text-emerald-300 text-xs font-bold text-center">
+                            緑青(古銅)
+                        </button>
+                        <button onclick="setMaterial('gold')" id="mat-gold" class="p-2 rounded-lg border border-slate-700 bg-yellow-950/40 text-yellow-300 text-xs font-bold text-center">
+                            黄金二宮
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 動きのカクカク度（コマ落とし設定） -->
+                <div class="space-y-2 bg-slate-950/60 p-3 rounded-xl border border-slate-800">
+                    <div class="flex justify-between items-center">
+                        <label class="text-xs text-slate-300 font-bold">カクカク度 (Choppy Rate)</label>
+                        <span id="choppy-value-display" class="text-xs font-mono font-bold text-amber-400">6 FPS</span>
+                    </div>
+                    <input type="range" id="slider-choppy" min="2" max="24" value="6" step="1" oninput="updateChoppiness(this.value)" class="w-full accent-amber-500 bg-slate-800 rounded-lg cursor-pointer h-2">
+                    <p class="text-[10px] text-slate-500">※値を下げるほど銅像特有のカクカクした硬いストップモーション動作になります。</p>
+                </div>
+
+                <!-- スピード・物理調整 -->
+                <div class="space-y-3">
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-400">回転速度 (Roll Speed)</span>
+                            <span id="roll-speed-num" class="font-mono text-amber-400">1.0x</span>
+                        </div>
+                        <input type="range" id="slider-rollspeed" min="0.5" max="2.5" value="1" step="0.1" oninput="updateRollSpeed(this.value)" class="w-full accent-amber-500 bg-slate-800 rounded-lg h-1.5">
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-slate-400">目の発光強度 (Evil Eye Glow)</span>
+                            <span id="glow-num" class="font-mono text-amber-400">1.0</span>
+                        </div>
+                        <input type="range" id="slider-glow" min="0" max="2" value="1" step="0.2" oninput="updateGlow(this.value)" class="w-full accent-amber-500 bg-slate-800 rounded-lg h-1.5">
+                    </div>
+                </div>
+
+                <!-- 特徴説明 -->
+                <div class="mt-auto bg-amber-950/20 border border-amber-900/30 p-3 rounded-xl text-xs text-amber-200/80 leading-relaxed space-y-1">
+                    <div class="font-bold text-amber-400 flex items-center gap-1">
+                        <i class="fa-solid fa-circle-info"></i> 敵役「二宮金次郎」の特徴
+                    </div>
+                    <p>・手に持つ本と背中の薪（柴）を維持したまま回転攻撃。</p>
+                    <p>・カクカクとした関節モーションで不気味な銅像感を演出。</p>
+                    <p>・回転攻撃前には目が赤く光り、溜め姿勢を取ります。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 2: プレイテスト環境 -->
+        <div id="view-game" class="hidden flex-1 flex flex-col lg:flex-row gap-4 w-full">
+            <div class="flex-1 bg-slate-950 rounded-2xl border border-slate-800 flex flex-col items-center justify-center relative overflow-hidden canvas-container min-h-[500px]">
+                
+                <!-- スコア・状態UI -->
+                <div class="absolute top-4 left-4 flex gap-4">
+                    <div class="bg-slate-900/90 border border-slate-700 px-4 py-2 rounded-xl backdrop-blur">
+                        <div class="text-[10px] text-slate-400 font-bold uppercase">Player HP</div>
+                        <div class="w-32 bg-slate-800 h-3 rounded-full overflow-hidden mt-1 border border-slate-700">
+                            <div id="player-hp-bar" class="bg-emerald-500 h-full w-full transition-all duration-200"></div>
+                        </div>
+                    </div>
+                    <div class="bg-slate-900/90 border border-slate-700 px-4 py-2 rounded-xl backdrop-blur">
+                        <div class="text-[10px] text-slate-400 font-bold uppercase">Kinjiro Status</div>
+                        <div id="game-boss-status" class="text-xs font-bold text-amber-400 mt-0.5">SEARCHING</div>
+                    </div>
+                </div>
+
+                <div class="absolute top-4 right-4">
+                    <button onclick="resetGame()" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow transition">
+                        <i class="fa-solid fa-rotate-right mr-1"></i> リセット
+                    </button>
+                </div>
+
+                <canvas id="gameCanvas" width="800" height="550" class="max-w-full max-h-full object-contain"></canvas>
+
+                <!-- 操作説明 -->
+                <div class="absolute bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur px-5 py-2 rounded-full border border-slate-700 text-xs text-slate-300 flex items-center gap-6">
+                    <span><kbd class="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-400 font-mono">WASD</kbd> / <kbd class="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-400 font-mono">矢印キー</kbd> 移動</span>
+                    <span><kbd class="px-2 py-0.5 bg-slate-800 border border-slate-600 rounded text-amber-400 font-mono">SPACE</kbd> 回避ダッシュ</span>
+                </div>
+            </div>
+
+            <!-- サイド説明・ログ -->
+            <div class="w-full lg:w-80 bg-slate-900 rounded-2xl border border-slate-800 p-5 flex flex-col gap-4">
+                <h3 class="font-bold text-slate-200 border-b border-slate-800 pb-2 flex items-center">
+                    <i class="fa-solid fa-shield-halved text-red-500 mr-2"></i> 敵AI挙動テスト
+                </h3>
+                <p class="text-xs text-slate-400 leading-relaxed">
+                    二宮金次郎はプレイヤーをカクカクと追従し、一定距離になると「ローリングアタック」を開始します。壁や障害物に跳ね返りながら突進してくるため、うまく回避してください。
+                </p>
+
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex-1 flex flex-col">
+                    <div class="text-xs text-slate-400 font-bold mb-2 flex justify-between">
+                        <span>バトルログ</span>
+                        <i class="fa-solid fa-terminal text-slate-600"></i>
+                    </div>
+                    <div id="game-log" class="flex-1 font-mono text-[11px] text-slate-400 space-y-1 overflow-y-auto max-h-60 p-1">
+                        <div class="text-emerald-400">> テスト開始。準備完了。</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 3: 組込用コード出力 -->
+        <div id="view-code" class="hidden flex-1 bg-slate-900 rounded-2xl border border-slate-800 p-6 flex flex-col gap-4 overflow-hidden">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+                <div>
+                    <h2 class="text-lg font-bold text-amber-300">他のゲーム用 ES6 / Canvas2D モジュールクラス</h2>
+                    <p class="text-xs text-slate-400">どんなHTML5 Canvasゲーム、Phaser、Vanilla JSにも即座に組み込める完全カプセル化コードです。</p>
+                </div>
+                <button onclick="copyCode()" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs transition flex items-center gap-2 shadow">
+                    <i class="fa-solid fa-copy"></i> コードをコピー
+                </button>
+            </div>
+
+            <div class="flex-1 bg-slate-950 rounded-xl border border-slate-800 p-4 overflow-y-auto font-mono text-xs text-slate-300 leading-relaxed">
+<pre><code id="export-code-block">// ======================================================
+// 二宮金次郎 (銅像敵キャラ) ベクタークラス - NinomiyaKinjiroEnemy.js
+// カクカク動作 & ローリングアタック対応
+// ======================================================
+
+class NinomiyaKinjiroEnemy {
+    constructor(x, y, config = {}) {
+        this.x = x;
+        this.y = y;
+        this.vx = 0;
+        this.vy = 0;
+        this.size = config.size || 60; // サイズ(基準半径)
+        
+        // ステート管理: IDLE, WALK, CHARGE, ROLLING, DAZED, HURT
+        this.state = 'IDLE'; 
+        
+        // カクカク度の設定 (描画コマ数制限)
+        this.choppyFps = config.choppyFps || 6; 
+        this.choppyTimer = 0;
+        this.renderPoseFrame = 0;
+        
+        // ローリングアタック物理パラメータ
+        this.rollAngle = 0;
+        this.rollSpeed = config.rollSpeed || 18;
+        this.chargeTimer = 0;
+        this.rollTimer = 0;
+        
+        // マテリアルカラー (bronze, patina, gold)
+        this.material = config.material || 'bronze';
+        
+        // AI設定
+        this.target = null;
+        this.attackCooldown = 0;
+    }
+
+    // マテリアルカラーパレット取得
+    getColors() {
+        switch(this.material) {
+            case 'patina': // 錆びた緑青
+                return { main: '#2a5a4b', dark: '#16382e', light: '#458572', highlight: '#73b3a0', book: '#884422' };
+            case 'gold': // 黄金二宮
+                return { main: '#d97706', dark: '#78350f', light: '#fbbf24', highlight: '#fef08a', book: '#451a03' };
+            case 'bronze': // クラシックブロンズ
+            default:
+                return { main: '#785e3a', dark: '#4d3b23', light: '#a38352', highlight: '#cbb087', book: '#5c1d11' };
+        }
+    }
+
+    // 状態のアップデート (毎フレーム呼出)
+    update(dt, targetPos) {
+        this.attackCooldown -= dt;
+        
+        // カクカクコマ送りアニメーションのステップ更新
+        this.choppyTimer += dt;
+        if (this.choppyTimer >= 1 / this.choppyFps) {
+            this.choppyTimer = 0;
+            this.renderPoseFrame++;
+        }
+
+        // AIロジック
+        switch (this.state) {
+            case 'IDLE':
+                this.vx = 0;
+                this.vy = 0;
+                if (targetPos) {
+                    const dist = Math.hypot(targetPos.x - this.x, targetPos.y - this.y);
+                    if (dist < 300) this.state = 'WALK';
+                }
+                break;
+
+            case 'WALK':
+                if (targetPos) {
+                    const dx = targetPos.x - this.x;
+                    const dy = targetPos.y - this.y;
+                    const angle = Math.atan2(dy, dx);
+                    // カクカク移動 (一定間隔でカクッと進む)
+                    const speed = 2.5;
+                    this.vx = Math.cos(angle) * speed;
+                    this.vy = Math.sin(angle) * speed;
+
+                    const dist = Math.hypot(dx, dy);
+                    if (dist < 200 && this.attackCooldown <= 0) {
+                        this.startRollingAttack(angle);
+                    }
+                }
+                break;
+
+            case 'CHARGE': // 溜め（本を閉じ、目が赤く発光）
+                this.vx *= 0.8;
+                this.vy *= 0.8;
+                this.chargeTimer -= dt;
+                if (this.chargeTimer <= 0) {
+                    this.state = 'ROLLING';
+                    this.rollTimer = 1.5; // 1.5秒間回転攻撃
+                }
+                break;
+
+            case 'ROLLING': // 高速ローリングアタック！
+                this.rollAngle += this.rollSpeed * dt * 10;
+                this.x += this.vx;
+                this.y += this.vy;
+                this.rollTimer -= dt;
+                if (this.rollTimer <= 0) {
+                    this.state = 'DAZED'; // 攻撃後の隙
+                    this.dazedTimer = 1.2;
+                    this.attackCooldown = 3.0; // クールダウン
+                }
+                break;
+
+            case 'DAZED':
+                this.vx = 0;
+                this.vy = 0;
+                this.dazedTimer -= dt;
+                if (this.dazedTimer <= 0) this.state = 'IDLE';
+                break;
+        }
+
+        this.x += this.vx;
+        this.y += this.vy;
+    }
+
+    startRollingAttack(angle) {
+        this.state = 'CHARGE';
+        this.chargeTimer = 0.6; // 0.6秒の溜め
+        this.targetAngle = angle;
+        // 攻撃方向に加速ベクトルをセット
+        this.vx = Math.cos(angle) * 12;
+        this.vy = Math.sin(angle) * 12;
+    }
+
+    // ベクター描画関数
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+
+        const c = this.getColors();
+        const f = this.renderPoseFrame; // カクカク動かすためのフレーム数
+
+        if (this.state === 'ROLLING') {
+            // --- ローリングアタック描画 (高速回転) ---
+            ctx.rotate(this.rollAngle);
+            
+            // 残像・回転エフェクト
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size * 0.8, 0, Math.PI * 2);
+            ctx.fillStyle = c.dark;
+            ctx.fill();
+
+            // 薪がぐるぐる回るシルエット
+            for (let i = 0; i < 4; i++) {
+                ctx.rotate(Math.PI / 2);
+                ctx.fillStyle = c.main;
+                ctx.fillRect(-this.size * 0.6, -10, this.size * 1.2, 20);
+                // 薪の断面
+                ctx.fillStyle = c.highlight;
+                ctx.beginPath();
+                ctx.arc(this.size * 0.6, 0, 8, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 回転の中心で光る本と赤目
+            ctx.fillStyle = c.book;
+            ctx.fillRect(-12, -10, 24, 20);
+            ctx.fillStyle = '#ff0000';
+            ctx.beginPath();
+            ctx.arc(-4, -2, 3, 0, Math.PI * 2);
+            ctx.arc(4, -2, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+        } else {
+            // --- 立ち/歩行/溜め 姿勢描画 (カクカクモーション) ---
+            
+            // カクカクした上下・揺れオフセット
+            const stepOffset = (this.state === 'WALK') ? ((f % 2 === 0) ? -4 : 4) : 0;
+            const legAngle = (this.state === 'WALK') ? ((f % 2 === 0) ? 0.2 : -0.2) : 0;
+
+            // 台座 (移動するときは地面をこする)
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(-25, 25, 50, 10);
+
+            // 1. 背中の薪 (Oikura / Firewood)
+            ctx.save();
+            ctx.translate(-10, -5 + stepOffset);
+            ctx.fillStyle = c.dark;
+            // 木枠
+            ctx.fillRect(-8, -35, 6, 40);
+            // 薪の束 (ベクターの束)
+            for(let i=0; i<5; i++) {
+                ctx.fillStyle = (i % 2 === 0) ? c.main : c.light;
+                ctx.fillRect(-15, -35 + (i * 7), 22, 5);
+            }
+            ctx.restore();
+
+            // 2. 脚 (カクカク関節)
+            ctx.save();
+            ctx.translate(0, 10);
+            ctx.fillStyle = c.dark;
+            // 左脚
+            ctx.fillRect(-12, 0, 8, 15);
+            // 右脚 (歩行時回転)
+            ctx.rotate(legAngle);
+            ctx.fillRect(4, 0, 8, 15);
+            ctx.restore();
+
+            // 3. 胴体 (着物・ブロンズ)
+            ctx.fillStyle = c.main;
+            ctx.beginPath();
+            ctx.moveTo(-16, 12 + stepOffset);
+            ctx.lineTo(-12, -20 + stepOffset);
+            ctx.lineTo(12, -20 + stepOffset);
+            ctx.lineTo(16, 12 + stepOffset);
+            ctx.closePath();
+            ctx.fill();
+
+            // 帯
+            ctx.fillStyle = c.dark;
+            ctx.fillRect(-14, -4 + stepOffset, 28, 6);
+
+            // 4. 頭部 & チョンマゲ
+            ctx.save();
+            ctx.translate(0, -28 + stepOffset);
+            
+            // 溜め時は少しうつむく
+            if (this.state === 'CHARGE') ctx.rotate(0.2);
+
+            ctx.fillStyle = c.light;
+            ctx.beginPath();
+            ctx.arc(0, 0, 12, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 目 (敵役なので鋭い＆発光)
+            if (this.state === 'CHARGE') {
+                ctx.fillStyle = '#ef4444'; // 攻撃溜め時は真っ赤
+                ctx.shadowColor = '#ef4444';
+                ctx.shadowBlur = 10;
+            } else {
+                ctx.fillStyle = '#000000';
+            }
+            ctx.fillRect(2, -2, 4, 3); // 前を睨む目
+
+            ctx.restore();
+
+            // 5. 腕 & 本 (二宮金次郎の象徴)
+            ctx.save();
+            ctx.translate(6, -12 + stepOffset);
+            
+            // 本の保持手
+            ctx.fillStyle = c.main;
+            ctx.fillRect(0, -2, 12, 6); // 腕
+
+            // 本 (敵モード時、溜めでガバッと開く)
+            ctx.translate(10, -2);
+            if (this.state === 'CHARGE') ctx.rotate(-0.4);
+
+            ctx.fillStyle = c.book;
+            ctx.fillRect(0, -8, 10, 14);
+            ctx.fillStyle = '#f8fafc'; // ページ
+            ctx.fillRect(2, -7, 7, 12);
+
+            ctx.restore();
+        }
+
+        ctx.restore();
+    }
+}
+</code></pre>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // --- 状態 & 設定変数 ---
+        let currentTab = 'viewer';
+        let showHitbox = false;
+        let choppyFps = 6;
+        let rollSpeedMultiplier = 1.0;
+        let eyeGlowMultiplier = 1.0;
+        let currentMaterial = 'bronze';
+
+        // メイン描画用アニメーションフレームハンドル
+        let viewerAnimId = null;
+        let gameAnimId = null;
+
+        // --- カラーパレット定義 ---
+        const MATERIALS = {
+            bronze: { main: '#785e3a', dark: '#4d3b23', light: '#a38352', highlight: '#cbb087', book: '#5c1d11', name: 'クラシック銅' },
+            patina: { main: '#2a5a4b', dark: '#16382e', light: '#458572', highlight: '#73b3a0', book: '#884422', name: '緑青(古銅)' },
+            gold:   { main: '#d97706', dark: '#78350f', light: '#fbbf24', highlight: '#fef08a', book: '#451a03', name: '黄金二宮' }
+        };
+
+        // --- 二宮金次郎 ビューア用オブジェクト ---
+        const kinjiroViewer = {
+            x: 300,
+            y: 260,
+            state: 'IDLE', // IDLE, WALK, CHARGE, ROLLING, DAZED, HURT
+            rollAngle: 0,
+            chargeTimer: 0,
+            rollTimer: 0,
+            dazedTimer: 0,
+            choppyTimer: 0,
+            frameStep: 0,
+            size: 80
+        };
+
+        // --- STREAMING_CHUNK:Initializing HTML Canvas and View Logic... ---
+        // タブ切り替え
+        function switchTab(tab) {
+            currentTab = tab;
+            document.getElementById('view-viewer').classList.add('hidden');
+            document.getElementById('view-game').classList.add('hidden');
+            document.getElementById('view-code').classList.add('hidden');
+
+            document.getElementById('tab-viewer').className = 'px-4 py-2 rounded-lg transition-all text-slate-400 hover:text-white';
+            document.getElementById('tab-game').className = 'px-4 py-2 rounded-lg transition-all text-slate-400 hover:text-white';
+            document.getElementById('tab-code').className = 'px-4 py-2 rounded-lg transition-all text-slate-400 hover:text-white';
+
+            if (tab === 'viewer') {
+                document.getElementById('view-viewer').classList.remove('hidden');
+                document.getElementById('tab-viewer').className = 'px-4 py-2 rounded-lg transition-all bg-amber-600 text-white shadow';
+                startViewerLoop();
+            } else if (tab === 'game') {
+                document.getElementById('view-game').classList.remove('hidden');
+                document.getElementById('tab-game').className = 'px-4 py-2 rounded-lg transition-all bg-amber-600 text-white shadow';
+                initGame();
+            } else if (tab === 'code') {
+                document.getElementById('view-code').classList.remove('hidden');
+                document.getElementById('tab-code').className = 'px-4 py-2 rounded-lg transition-all bg-amber-600 text-white shadow';
+            }
+        }
+
+        // コントロール操作
+        function setKinjiroState(state) {
+            kinjiroViewer.state = state;
+            document.getElementById('current-state-label').innerText = `STATE: ${state}`;
+        }
+
+        function triggerRollingAttack() {
+            kinjiroViewer.state = 'CHARGE';
+            kinjiroViewer.chargeTimer = 0.6;
+            document.getElementById('current-state-label').innerText = `STATE: CHARGING...`;
+        }
+
+        function setMaterial(mat) {
+            currentMaterial = mat;
+            ['bronze', 'patina', 'gold'].forEach(m => {
+                const btn = document.getElementById(`mat-${m}`);
+                if (m === mat) {
+                    btn.className = `p-2 rounded-lg border-2 border-amber-500 bg-amber-950/40 text-amber-300 text-xs font-bold text-center`;
+                } else {
+                    btn.className = `p-2 rounded-lg border border-slate-700 bg-slate-900 text-slate-400 text-xs font-bold text-center hover:text-slate-200`;
+                }
+            });
+        }
+
+        function updateChoppiness(val) {
+            choppyFps = parseInt(val);
+            document.getElementById('choppy-value-display').innerText = `${choppyFps} FPS`;
+        }
+
+        function updateRollSpeed(val) {
+            rollSpeedMultiplier = parseFloat(val);
+            document.getElementById('roll-speed-num').innerText = `${rollSpeedMultiplier.toFixed(1)}x`;
+        }
+
+        function updateGlow(val) {
+            eyeGlowMultiplier = parseFloat(val);
+            document.getElementById('glow-num').innerText = `${eyeGlowMultiplier.toFixed(1)}`;
+        }
+
+        function toggleHitbox() {
+            showHitbox = !showHitbox;
+            document.getElementById('btn-hitbox').innerHTML = showHitbox 
+                ? `<i class="fa-solid fa-vector-square mr-1 text-emerald-400"></i> 当たり判定: ON`
+                : `<i class="fa-solid fa-vector-square mr-1"></i> 当たり判定: OFF`;
+        }
+
+        // 二宮金次郎 ベクター描画コア関数 (ビューア・ゲーム共用)
+        function drawKinjiroVector(ctx, x, y, state, frameStep, angle = 0, scale = 1.0) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(scale, scale);
+
+            const c = MATERIALS[currentMaterial];
+
+            // 当たり判定デバッグ領域
+            if (showHitbox) {
+                ctx.strokeStyle = '#ef4444';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(0, 0, 45, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            if (state === 'ROLLING') {
+                // --- ローリングアタック (ぐるぐる回転体当たり) ---
+                ctx.rotate(angle);
+
+                // 回転残像（ブロンズの円弧）
+                ctx.fillStyle = c.dark;
+                ctx.beginPath();
+                ctx.arc(0, 0, 42, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 薪束の回転ブレード効果
+                for (let i = 0; i < 4; i++) {
+                    ctx.rotate(Math.PI / 2);
+                    ctx.fillStyle = (i % 2 === 0) ? c.main : c.light;
+                    ctx.fillRect(-35, -12, 70, 24);
+                    
+                    // 薪の断面（年輪ディテール）
+                    ctx.fillStyle = c.highlight;
+                    ctx.beginPath();
+                    ctx.arc(30, 0, 7, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // 中心：本＆発光する怪しい目
+                ctx.fillStyle = c.book;
+                ctx.fillRect(-14, -12, 28, 24);
+                
+                // ページ
+                ctx.fillStyle = '#f8fafc';
+                ctx.fillRect(-10, -10, 20, 20);
+
+                // ギロリと光る両目
+                ctx.fillStyle = '#ff0000';
+                ctx.shadowColor = '#ff0000';
+                ctx.shadowBlur = 12 * eyeGlowMultiplier;
+                ctx.beginPath();
+                ctx.arc(-5, 0, 4, 0, Math.PI * 2);
+                ctx.arc(5, 0, 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+            } else {
+                // --- 立ち/歩行/溜め (カクカクモーション) ---
+
+                // カクカク度に応じた高さオフセット＆足の角度
+                const choppyY = (state === 'WALK') ? ((frameStep % 2 === 0) ? -5 : 5) : 0;
+                const legAngle = (state === 'WALK') ? ((frameStep % 2 === 0) ? 0.25 : -0.25) : 0;
+                const dazedTilt = (state === 'DAZED') ? Math.sin(Date.now() * 0.01) * 0.2 : 0;
+
+                ctx.rotate(dazedTilt);
+
+                // 石の台座 (銅像らしさの象徴)
+                ctx.fillStyle = '#334155';
+                ctx.fillRect(-30, 38, 60, 12);
+                ctx.fillStyle = '#1e293b';
+                ctx.fillRect(-35, 50, 70, 8);
+
+                // 歩行時の台座火花エフェクト
+                if (state === 'WALK' && frameStep % 2 === 0) {
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.fillRect(-20 + Math.random()*40, 48, 4, 4);
+                }
+
+                // 1. 背中の薪 (Oikura)
+                ctx.save();
+                ctx.translate(-12, -8 + choppyY);
+                ctx.fillStyle = c.dark;
+                ctx.fillRect(-10, -48, 8, 55); // 木枠背骨
+
+                // 積まれた薪ベクター
+                for(let i = 0; i < 6; i++) {
+                    ctx.fillStyle = (i % 2 === 0) ? c.main : c.light;
+                    ctx.fillRect(-22, -48 + (i * 9), 32, 7);
+                    // 薪の縄止め
+                    ctx.fillStyle = c.dark;
+                    ctx.fillRect(-12, -48 + (i * 9), 3, 7);
+                }
+                ctx.restore();
+
+                // 2. 脚 (カクカク関節)
+                ctx.save();
+                ctx.translate(0, 12);
+                
+                // 左脚
+                ctx.fillStyle = c.dark;
+                ctx.fillRect(-14, 0, 10, 26);
+                ctx.fillStyle = c.main;
+                ctx.fillRect(-16, 26, 14, 8); // 草履
+
+                // 右脚
+                ctx.save();
+                ctx.rotate(legAngle);
+                ctx.fillStyle = c.dark;
+                ctx.fillRect(4, 0, 10, 26);
+                ctx.fillStyle = c.main;
+                ctx.fillRect(2, 26, 14, 8); // 草履
+                ctx.restore();
+
+                ctx.restore();
+
+                // 3. 胴体 (ブロンズ着物)
+                ctx.fillStyle = c.main;
+                ctx.beginPath();
+                ctx.moveTo(-22, 14 + choppyY);
+                ctx.lineTo(-16, -28 + choppyY);
+                ctx.lineTo(16, -28 + choppyY);
+                ctx.lineTo(22, 14 + choppyY);
+                ctx.closePath();
+                ctx.fill();
+
+                // 胸元の襟合わせ
+                ctx.strokeStyle = c.dark;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(-16, -28 + choppyY);
+                ctx.lineTo(0, -10 + choppyY);
+                ctx.lineTo(16, -28 + choppyY);
+                ctx.stroke();
+
+                // 帯
+                ctx.fillStyle = c.dark;
+                ctx.fillRect(-20, -5 + choppyY, 40, 8);
+
+                // 4. 頭部 (ブロンズの顔・チョンマゲ)
+                ctx.save();
+                ctx.translate(0, -38 + choppyY);
+
+                if (state === 'CHARGE') {
+                    ctx.translate(4, 4); // 溜め時は身構えて前傾
+                }
+
+                // 頭グラデーション風ベクター
+                ctx.fillStyle = c.light;
+                ctx.beginPath();
+                ctx.arc(0, 0, 16, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 髪型 / チョンマゲ
+                ctx.fillStyle = c.dark;
+                ctx.beginPath();
+                ctx.arc(0, -14, 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 目の描画
+                if (state === 'CHARGE') {
+                    // 赤い鋭い光
+                    ctx.fillStyle = '#ef4444';
+                    ctx.shadowColor = '#ef4444';
+                    ctx.shadowBlur = 10 * eyeGlowMultiplier;
+                    ctx.beginPath();
+                    ctx.fillRect(3, -3, 8, 4);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                } else if (state === 'DAZED') {
+                    // グルグル目
+                    ctx.strokeStyle = '#f59e0b';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.arc(6, -2, 5, 0, Math.PI * 1.5);
+                    ctx.stroke();
+                } else {
+                    // 通常時 (真剣な銅像の目)
+                    ctx.fillStyle = c.dark;
+                    ctx.fillRect(4, -3, 6, 4);
+                }
+
+                ctx.restore();
+
+                // 5. 手と本 (二宮金次郎の読書ポーズ)
+                ctx.save();
+                ctx.translate(8, -18 + choppyY);
+
+                // 腕
+                ctx.fillStyle = c.main;
+                ctx.fillRect(0, -4, 18, 8);
+
+                // 本
+                ctx.translate(14, -4);
+                if (state === 'CHARGE') {
+                    ctx.rotate(-0.5); // 本をカクッと立てて構える
+                }
+
+                ctx.fillStyle = c.book;
+                ctx.fillRect(0, -12, 14, 20);
+                ctx.fillStyle = '#f8fafc'; // ページ
+                ctx.fillRect(3, -10, 10, 16);
+                
+                // 本の文字表現 (ライン)
+                ctx.fillStyle = '#94a3b8';
+                ctx.fillRect(5, -6, 6, 2);
+                ctx.fillRect(5, -2, 6, 2);
+                ctx.fillRect(5, 2, 6, 2);
+
+                ctx.restore();
+
+                // 被弾エフェクト (HURT時)
+                if (state === 'HURT') {
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 50, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            ctx.restore();
+        }
+
+        // --- ビューアーループ ---
+        let lastTime = performance.now();
+
+        function startViewerLoop() {
+            if (viewerAnimId) cancelAnimationFrame(viewerAnimId);
+
+            const canvas = document.getElementById('viewerCanvas');
+            const ctx = canvas.getContext('2d');
+
+            function render(now) {
+                const dt = (now - lastTime) / 1000;
+                lastTime = now;
+
+                // カクカクタイマー更新
+                kinjiroViewer.choppyTimer += dt;
+                if (kinjiroViewer.choppyTimer >= 1 / choppyFps) {
+                    kinjiroViewer.choppyTimer = 0;
+                    kinjiroViewer.frameStep++;
+                }
+
+                // 状態アニメーション更新
+                if (kinjiroViewer.state === 'CHARGE') {
+                    kinjiroViewer.chargeTimer -= dt;
+                    if (kinjiroViewer.chargeTimer <= 0) {
+                        kinjiroViewer.state = 'ROLLING';
+                        kinjiroViewer.rollTimer = 2.0;
+                    }
+                } else if (kinjiroViewer.state === 'ROLLING') {
+                    kinjiroViewer.rollAngle += 15 * rollSpeedMultiplier * dt;
+                    kinjiroViewer.rollTimer -= dt;
+                    if (kinjiroViewer.rollTimer <= 0) {
+                        kinjiroViewer.state = 'DAZED';
+                        kinjiroViewer.dazedTimer = 1.5;
+                        document.getElementById('current-state-label').innerText = `STATE: DAZED`;
+                    }
+                } else if (kinjiroViewer.state === 'DAZED') {
+                    kinjiroViewer.dazedTimer -= dt;
+                    if (kinjiroViewer.dazedTimer <= 0) {
+                        kinjiroViewer.state = 'IDLE';
+                        document.getElementById('current-state-label').innerText = `STATE: IDLE`;
+                    }
+                }
+
+                // 画面クリア
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // 床の陰影
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.beginPath();
+                ctx.ellipse(kinjiroViewer.x, kinjiroViewer.y + 50, 50, 12, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 描画実行
+                drawKinjiroVector(
+                    ctx, 
+                    kinjiroViewer.x, 
+                    kinjiroViewer.y, 
+                    kinjiroViewer.state, 
+                    kinjiroViewer.frameStep, 
+                    kinjiroViewer.rollAngle, 
+                    1.4
+                );
+
+                viewerAnimId = requestAnimationFrame(render);
+            }
+
+            viewerAnimId = requestAnimationFrame(render);
+        }
+
+        // --- VIEW 2: プレイテストゲーム実装 ---
+        let gamePlayer = { x: 150, y: 275, hp: 100, speed: 4, vx: 0, vy: 0 };
+        let gameBoss = { 
+            x: 650, 
+            y: 275, 
+            vx: 0, 
+            vy: 0, 
+            state: 'WALK', 
+            rollAngle: 0, 
+            chargeTimer: 0, 
+            rollTimer: 0, 
+            attackCooldown: 1.0,
+            choppyTimer: 0,
+            frameStep: 0
+        };
+        let keys = {};
+
+        function addGameLog(msg, color = 'text-slate-400') {
+            const logEl = document.getElementById('game-log');
+            const item = document.createElement('div');
+            item.className = color;
+            item.innerText = `> ${msg}`;
+            logEl.appendChild(item);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function resetGame() {
+            gamePlayer = { x: 150, y: 275, hp: 100, speed: 4, vx: 0, vy: 0 };
+            gameBoss = { 
+                x: 650, 
+                y: 275, 
+                vx: 0, 
+                vy: 0, 
+                state: 'WALK', 
+                rollAngle: 0, 
+                chargeTimer: 0, 
+                rollTimer: 0, 
+                attackCooldown: 1.5,
+                choppyTimer: 0,
+                frameStep: 0
+            };
+            document.getElementById('player-hp-bar').style.width = '100%';
+            document.getElementById('game-log').innerHTML = '<div class="text-emerald-400">> バトルリセット完了。</div>';
+        }
+
+        window.addEventListener('keydown', e => keys[e.code] = true);
+        window.addEventListener('keyup', e => keys[e.code] = false);
+
+        function initGame() {
+            if (gameAnimId) cancelAnimationFrame(gameAnimId);
+
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            let gameLastTime = performance.now();
+
+            function gameLoop(now) {
+                const dt = (now - gameLastTime) / 1000;
+                gameLastTime = now;
+
+                // --- 1. プレイヤー移動入力 ---
+                gamePlayer.vx = 0;
+                gamePlayer.vy = 0;
+                if (keys['KeyW'] || keys['ArrowUp']) gamePlayer.vy = -gamePlayer.speed;
+                if (keys['KeyS'] || keys['ArrowDown']) gamePlayer.vy = gamePlayer.speed;
+                if (keys['KeyA'] || keys['ArrowLeft']) gamePlayer.vx = -gamePlayer.speed;
+                if (keys['KeyD'] || keys['ArrowRight']) gamePlayer.vx = gamePlayer.speed;
+
+                // 回避ダッシュ
+                if (keys['Space']) {
+                    gamePlayer.vx *= 1.8;
+                    gamePlayer.vy *= 1.8;
+                }
+
+                gamePlayer.x = Math.max(30, Math.min(canvas.width - 30, gamePlayer.x + gamePlayer.vx));
+                gamePlayer.y = Math.max(30, Math.min(canvas.height - 30, gamePlayer.y + gamePlayer.vy));
+
+                // --- 2. 二宮金次郎 敵AI制御 ---
+                gameBoss.choppyTimer += dt;
+                if (gameBoss.choppyTimer >= 1 / choppyFps) {
+                    gameBoss.choppyTimer = 0;
+                    gameBoss.frameStep++;
+                }
+
+                gameBoss.attackCooldown -= dt;
+                const dx = gamePlayer.x - gameBoss.x;
+                const dy = gamePlayer.y - gameBoss.y;
+                const dist = Math.hypot(dx, dy);
+
+                const statusLabel = document.getElementById('game-boss-status');
+
+                switch(gameBoss.state) {
+                    case 'WALK':
+                        statusLabel.innerText = "PURSUING (追従中)";
+                        statusLabel.className = "text-xs font-bold text-emerald-400 mt-0.5";
+                        
+                        // カクカク移動 (ステップごとにガクッと移動)
+                        if (gameBoss.frameStep % 2 === 0) {
+                            const angle = Math.atan2(dy, dx);
+                            gameBoss.x += Math.cos(angle) * 2.2;
+                            gameBoss.y += Math.sin(angle) * 2.2;
+                        }
+
+                        // 一定距離＆クールダウン完了でローリングアタック発動
+                        if (dist < 280 && gameBoss.attackCooldown <= 0) {
+                            gameBoss.state = 'CHARGE';
+                            gameBoss.chargeTimer = 0.7;
+                            gameBoss.targetAngle = Math.atan2(dy, dx);
+                            addGameLog('二宮金次郎が本を閉じ、構えた！', 'text-amber-400 font-bold');
+                        }
+                        break;
+
+                    case 'CHARGE':
+                        statusLabel.innerText = "CHARGING ATTACK!";
+                        statusLabel.className = "text-xs font-bold text-red-500 animate-pulse mt-0.5";
+                        gameBoss.chargeTimer -= dt;
+                        if (gameBoss.chargeTimer <= 0) {
+                            gameBoss.state = 'ROLLING';
+                            gameBoss.rollTimer = 2.0;
+                            // 突進スピード設定
+                            gameBoss.vx = Math.cos(gameBoss.targetAngle) * 14 * rollSpeedMultiplier;
+                            gameBoss.vy = Math.sin(gameBoss.targetAngle) * 14 * rollSpeedMultiplier;
+                            addGameLog('ローリングアタック発動！！', 'text-red-400 font-bold');
+                        }
+                        break;
+
+                    case 'ROLLING':
+                        statusLabel.innerText = "ROLLING ATTACK!!";
+                        statusLabel.className = "text-xs font-bold text-red-400 mt-0.5";
+
+                        gameBoss.rollAngle += 20 * dt;
+                        gameBoss.x += gameBoss.vx;
+                        gameBoss.y += gameBoss.vy;
+
+                        // 壁での跳ね返り (バウンド)
+                        if (gameBoss.x < 40 || gameBoss.x > canvas.width - 40) {
+                            gameBoss.vx *= -1;
+                            addGameLog('金次郎が壁で跳ね返った！', 'text-slate-400');
+                        }
+                        if (gameBoss.y < 40 || gameBoss.y > canvas.height - 40) {
+                            gameBoss.vy *= -1;
+                            addGameLog('金次郎が壁で跳ね返った！', 'text-slate-400');
+                        }
+
+                        // プレイヤーとの体当たり判定
+                        if (dist < 45) {
+                            gamePlayer.hp = Math.max(0, gamePlayer.hp - 25);
+                            document.getElementById('player-hp-bar').style.width = `${gamePlayer.hp}%`;
+                            addGameLog('体当たりヒット！25ダメージ！', 'text-red-500 font-bold');
+                            gameBoss.state = 'DAZED';
+                            gameBoss.dazedTimer = 1.5;
+                        }
+
+                        gameBoss.rollTimer -= dt;
+                        if (gameBoss.rollTimer <= 0) {
+                            gameBoss.state = 'DAZED';
+                            gameBoss.dazedTimer = 1.5;
+                            gameBoss.attackCooldown = 3.5;
+                            addGameLog('金次郎が目を回している！隙あり！', 'text-yellow-400');
+                        }
+                        break;
+
+                    case 'DAZED':
+                        statusLabel.innerText = "DAZED (隙状態)";
+                        statusLabel.className = "text-xs font-bold text-yellow-400 mt-0.5";
+                        gameBoss.dazedTimer -= dt;
+                        if (gameBoss.dazedTimer <= 0) {
+                            gameBoss.state = 'WALK';
+                        }
+                        break;
+                }
+
+                // --- 3. ゲーム画面クリア & 描画 ---
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // アリーナ枠線
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 4;
+                ctx.strokeRect(15, 15, canvas.width - 30, canvas.height - 30);
+
+                // 影
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.beginPath();
+                ctx.ellipse(gamePlayer.x, gamePlayer.y + 15, 16, 6, 0, 0, Math.PI * 2);
+                ctx.ellipse(gameBoss.x, gameBoss.y + 25, 30, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // プレイヤー描画 (簡単なヒーローアイコン)
+                ctx.fillStyle = '#38bdf8';
+                ctx.beginPath();
+                ctx.arc(gamePlayer.x, gamePlayer.y, 14, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#0284c7';
+                ctx.beginPath();
+                ctx.arc(gamePlayer.x, gamePlayer.y - 3, 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 敵役：二宮金次郎描画
+                drawKinjiroVector(
+                    ctx, 
+                    gameBoss.x, 
+                    gameBoss.y, 
+                    gameBoss.state, 
+                    gameBoss.frameStep, 
+                    gameBoss.rollAngle, 
+                    0.8
+                );
+
+                gameAnimId = requestAnimationFrame(gameLoop);
+            }
+
+            gameAnimId = requestAnimationFrame(gameLoop);
+        }
+
+        // --- コードコピー機能 ---
+        function copyCode() {
+            const codeText = document.getElementById('export-code-block').innerText;
+            navigator.clipboard.writeText(codeText).then(() => {
+                alert('コードをクリップボードにコピーしました！');
+            });
+        }
+
+        // 初期ロード時
+        window.onload = () => {
+            startViewerLoop();
+        };
+    </script>
+</body>
+</html>

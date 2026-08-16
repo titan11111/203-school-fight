@@ -22,6 +22,7 @@
     function muzzleLift(entity, kind) {
         const down = entity.facing === 'down';
         if (kind === 'flute') return down ? 54 : 68;
+        if (kind === 'saber') return down ? 46 : 56;
         return down ? 42 : 50;
     }
 
@@ -56,6 +57,16 @@
             sfx: 'flute',
             attackAnim: function (combo) { return combo === 3 ? 'flute_shot' : 'flute_play'; },
             skillAnim: 'flute_shot'
+        },
+        saber: {
+            id: 'saber',
+            name: 'ビームサーベル',
+            attackFrames: 14,
+            skillCost: 30,
+            skillFrames: 22,
+            sfx: 'saber',
+            attackAnim: function () { return 'yoyo_throw'; },
+            skillAnim: 'yoyo_spin_c'
         }
     };
 
@@ -81,6 +92,25 @@
                 poise: 6 + comboStep * 3,
                 owner: 'player',
                 note: comboStep
+            });
+            return w;
+        }
+        if (w.id === 'saber') {
+            const shot = muzzle(player, 22, 'saber');
+            const reach = 46 + comboStep * 10;
+            projectiles.spawn({
+                x: shot.x + dir.x * reach * 0.45,
+                y: shot.y + dir.y * reach * 0.45,
+                vx: dir.x * 3,
+                vy: dir.y * 3,
+                life: 11,
+                kind: 'saber',
+                radius: 22 + comboStep * 3,
+                damage: Math.floor(player.atk * (1.15 + comboStep * 0.28)),
+                poise: 12 + comboStep * 5,
+                owner: 'player',
+                facing: player.facing,
+                beamLen: reach
             });
             return w;
         }
@@ -124,6 +154,24 @@
                     note: i
                 });
             }
+            return origin;
+        }
+        if (w.id === 'saber') {
+            const dir = facingVec(player.facing);
+            projectiles.spawn({
+                x: origin.x + dir.x * 36,
+                y: origin.y + dir.y * 36,
+                vx: dir.x * 14,
+                vy: dir.y * 14,
+                life: 22,
+                kind: 'saber',
+                radius: 20,
+                damage: Math.floor(player.atk * 1.85),
+                poise: 26,
+                owner: 'player',
+                facing: player.facing,
+                beamLen: 92
+            });
             return origin;
         }
         projectiles.spawn({
@@ -297,6 +345,8 @@
             p.spin = !!data.spin;
             p.homeX = data.homeX || 0;
             p.homeY = data.homeY || 0;
+            p.facing = data.facing || 'right';
+            p.beamLen = data.beamLen || 0;
             p.hitIds = null;
             this.live.push(p);
             if (this.live.length > this.limit) {
@@ -384,6 +434,18 @@
                     ctx.fillRect(-7, -7, 14, 14);
                     ctx.fillStyle = '#fde68a';
                     ctx.fillRect(-3, -3, 6, 6);
+                } else if (p.kind === 'saber') {
+                    const ang = p.facing === 'left' ? Math.PI : p.facing === 'up' ? -Math.PI / 2 : p.facing === 'down' ? Math.PI / 2 : 0;
+                    const len = p.beamLen || 56;
+                    ctx.rotate(ang);
+                    ctx.fillStyle = 'rgba(52, 211, 153, 0.28)';
+                    ctx.fillRect(((-len / 2) | 0), -10, len | 0, 20);
+                    ctx.fillStyle = '#6ee7b7';
+                    ctx.fillRect(((-len / 2) | 0), -5, len | 0, 10);
+                    ctx.fillStyle = '#ecfdf5';
+                    ctx.fillRect(((-len / 2) | 0), -2, len | 0, 4);
+                    ctx.fillStyle = '#334155';
+                    ctx.fillRect(((-len / 2) | 0) - 6, -4, 10, 8);
                 } else if (p.kind === 'note') {
                     ctx.fillStyle = p.note % 2 ? '#c084fc' : '#67e8f9';
                     ctx.beginPath();

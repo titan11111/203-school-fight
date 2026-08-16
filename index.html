@@ -273,8 +273,8 @@
         <!-- プレイヤー ステータス -->
         <div class="glass-panel p-2 rounded-2xl flex items-center gap-3 border border-pink-500/30 pointer-events-auto min-w-0 max-w-[58%]">
             <div class="relative">
-                <div id="player-avatar" class="w-12 h-12 rounded-xl bg-gradient-to-tr from-pink-500 to-indigo-500 flex items-center justify-center font-bold text-xl border-2 border-white/40 shadow-lg">
-                    生
+                <div id="player-avatar" class="w-14 h-12 rounded-xl bg-gradient-to-tr from-pink-500 to-indigo-500 flex items-center justify-center font-black text-[13px] leading-none tracking-tight whitespace-nowrap border-2 border-white/40 shadow-lg">
+                    生徒
                 </div>
                 <div id="player-level" class="absolute -bottom-2 -right-2 bg-yellow-400 text-slate-900 font-extrabold text-xs px-2 py-0.5 rounded-full border border-black shadow">
                     Lv.1
@@ -499,6 +499,7 @@
     <script src="combat.js"></script>
     <script src="shops.js"></script>
     <script src="arcade.js"></script>
+    <script src="park-vectors.js"></script>
     <script src="enemies.js"></script>
     <script src="school-map.js"></script>
     <script>
@@ -546,7 +547,7 @@
         const GameState = {
             started: false,
             paused: false,
-            currentArea: 'SCHOOL', // SCHOOL, ROAD, SHOPPING, PARK
+            currentArea: 'SCHOOL', // SCHOOL, SCHOOL_HALL, ROAD, SHOPPING, PARK
             questStep: 0,
             money: 100,
             inventory: [
@@ -559,6 +560,8 @@
             audioInitialized: false,
             skeletalReady: false,
             weapon: 'yoyo',
+            ownedWeapons: ['yoyo'],
+            hasSaber: false,
             bossPhase: 1,
             minigame: null,
             portalLock: 0
@@ -602,7 +605,9 @@
             kinjiro: './images/char-kinjiro.svg',
             chicken: './images/char-chicken.svg',
             rabbit: './images/char-rabbit.svg',
-            bike_kid: './images/char-bike-kid.svg'
+            bike_kid: './images/char-bike-kid.svg',
+            frog: './images/char-frog.svg',
+            traffic_uncle: './images/char-traffic-uncle.svg'
         };
         const CHAR_ART = {};
 
@@ -611,9 +616,15 @@
             if (kind === 'bakery_owner') return 'baker';
             if (kind === 'dagashi_owner') return 'teacher';
             if (kind === 'arcade_clerk') return 'delinquent';
-            if (kind === 'shopper_auntie' || kind === 'shopper_auntie2') return 'auntie';
-            if (kind === 'shopper_grandpa') return 'grandpa';
-            if (kind === 'shopper_child' || kind === 'shopper_child2') return 'child';
+            if (kind === 'shopper_auntie' || kind === 'shopper_auntie2' || kind === 'queue_auntie' || kind === 'queue_lady') return 'auntie';
+            if (kind === 'shopper_grandpa' || kind === 'queue_grandpa') return 'grandpa';
+            if (kind === 'shopper_child' || kind === 'shopper_child2' || kind === 'hall_student' || kind === 'queue_child') return 'child';
+            if (kind === 'queue_student') return 'delinquent';
+            if (kind === 'queue_office') return 'teacher';
+            if (kind === 'hall_nurse') return 'teacher';
+            if (kind === 'janitor') return 'grandpa';
+            if (kind === 'isekai_frog') return 'frog';
+            if (kind === 'traffic_uncle') return 'traffic_uncle';
             return kind;
         }
 
@@ -644,19 +655,23 @@
         function drawCharArt(ctx, kind, x, y, facing = 'down', flipOverride = null, anim = {}) {
             const img = CHAR_ART[charArtKey(kind)];
             const bob = anim.bob || 0;
-            const drawY = y + bob;
+            const hopLift = anim.hopLift || 0;
+            const drawY = y + bob - hopLift;
             if (!img) {
-                drawGroundShadow(ctx, x, drawY, 48);
+                drawGroundShadow(ctx, x, y, 48);
                 return 48;
             }
             const artScale = HERO_DRAW_SCALE * (anim.scale || 1);
             const w = (img.naturalWidth || img.width) * artScale;
             const h = (img.naturalHeight || img.height) * artScale;
-            drawGroundShadow(ctx, x, drawY, h);
+            const shadowH = hopLift > 2 ? Math.max(28, (h * (1 - hopLift * 0.014)) | 0) : h;
+            drawGroundShadow(ctx, x, y, shadowH);
             ctx.save();
             ctx.imageSmoothingEnabled = false;
             ctx.translate(x | 0, drawY | 0);
-            if (anim.squash && anim.squash !== 1) ctx.scale(1, anim.squash);
+            const sx = anim.squashX || 1;
+            const sy = anim.squash || 1;
+            if (sx !== 1 || sy !== 1) ctx.scale(sx, sy);
             const facesLeftByDefault = flipOverride === true;
             const shouldFlip = facesLeftByDefault
                 ? (facing === 'right')
@@ -729,6 +744,7 @@
             constructor() {
                 this.synth = null;
                 this.bgmSynth = null;
+                this.fanfareSynth = null;
                 this.loop = null;
                 this.voices = {
                     mutter: this.makeClip('audio/voice-mutter.m4a', 0.22)
@@ -737,14 +753,17 @@
                 this.mutterOn = false;
                 this.bgm = {
                     school: this.makeClip('audio/bgm-skeletons.m4a', 0.46),
+                    road: this.makeClip('audio/bgm-road.m4a', 0.48),
                     town: this.makeClip('audio/bgm-lantern.m4a', 0.46),
                     park: this.makeClip('audio/bgm-showdown.m4a', 0.52)
                 };
                 Object.keys(this.bgm).forEach((key) => { this.bgm[key].loop = true; });
                 this.bgmTheme = null;
-                this.roadParts = null;
+                this._playing = null;
+                this._pendingArea = null;
                 this.areaTheme = {
                     SCHOOL: 'school',
+                    SCHOOL_HALL: 'school',
                     ROAD: 'road',
                     SHOPPING: 'town',
                     BAKERY: 'town',
@@ -757,17 +776,27 @@
             makeClip(src, volume) {
                 const el = new Audio(src);
                 el.preload = 'auto';
+                el.loop = true;
+                el.playsInline = true;
+                el.setAttribute('playsinline', 'true');
                 el.volume = volume;
                 return el;
             }
 
             unlockClip(el) {
                 if (!el) return;
+                const keep = el === this._playing;
+                if (!keep) el.muted = true;
                 const p = el.play();
+                if (!keep) {
+                    el.pause();
+                    try { el.currentTime = 0; } catch (e) { /* ignore */ }
+                    el.muted = false;
+                }
                 if (p && p.then) {
                     p.then(() => {
+                        if (el === this._playing) return;
                         el.pause();
-                        el.currentTime = 0;
                     }).catch(() => {});
                 }
             }
@@ -781,23 +810,43 @@
             }
 
             init() {
-                if (GameState.audioInitialized) return;
+                if (GameState.audioInitialized) {
+                    this.resumeBgm();
+                    return;
+                }
                 try {
-                    Tone.start();
-                    this.unlockClip(this.voices.mutter);
-                    Object.keys(this.bgm).forEach((key) => this.unlockClip(this.bgm[key]));
+                    if (window.Tone && Tone.start) Tone.start();
                     this.synth = new Tone.PolySynth(Tone.Synth).toDestination();
                     this.synth.volume.value = -10;
-
                     this.bgmSynth = new Tone.MembraneSynth().toDestination();
                     this.bgmSynth.volume.value = -8;
-
+                    this.fanfareSynth = new Tone.PolySynth(Tone.Synth, {
+                        oscillator: { type: 'square' },
+                        envelope: { attack: 0.004, decay: 0.09, sustain: 0.22, release: 0.24 }
+                    }).toDestination();
+                    this.fanfareSynth.volume.value = -7;
                     Tone.Transport.bpm.value = 120;
                     Tone.Transport.start();
                     GameState.audioInitialized = true;
-                    if (GameState.started) this.playAreaBgm(GameState.currentArea, true);
+                    const area = this._pendingArea || (GameState.started ? GameState.currentArea : null);
+                    if (area) this.playAreaBgm(area, true);
+                    this.unlockClip(this.voices.mutter);
+                    Object.keys(this.bgm).forEach((key) => this.unlockClip(this.bgm[key]));
                 } catch (e) {
                     GameState.audioInitialized = true;
+                    if (GameState.started) this.playAreaBgm(GameState.currentArea, true);
+                }
+            }
+
+            resumeBgm() {
+                if (this._pendingArea && GameState.audioInitialized) {
+                    const area = this._pendingArea;
+                    this._pendingArea = null;
+                    this.playAreaBgm(area, true);
+                    return;
+                }
+                if (this._playing && this._playing.paused) {
+                    this._playing.play().catch(() => {});
                 }
             }
 
@@ -812,8 +861,25 @@
             }
 
             playLevelUp() {
-                if (!GameState.audioInitialized) return;
+                if (!GameState.audioInitialized || !this.synth) return;
                 this.synth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "8n");
+            }
+
+            playLevelFanfare() {
+                if (!GameState.audioInitialized) return;
+                const s = this.fanfareSynth || this.synth;
+                if (!s) return;
+                const now = (window.Tone && Tone.now) ? Tone.now() : 0;
+                const step = 0.1;
+                try {
+                    s.triggerAttackRelease('G5', '16n', now);
+                    s.triggerAttackRelease('B5', '16n', now + step);
+                    s.triggerAttackRelease('D6', '16n', now + step * 2);
+                    s.triggerAttackRelease('G6', '16n', now + step * 3);
+                    s.triggerAttackRelease('D6', '16n', now + step * 4.15);
+                    s.triggerAttackRelease('G6', '8n', now + step * 5.15);
+                    s.triggerAttackRelease(['G4', 'B4', 'D5', 'G5'], '4n', now + step * 6.4);
+                } catch (e) { /* ignore */ }
             }
 
             playDash() {
@@ -830,6 +896,8 @@
                 if (!GameState.audioInitialized || !this.synth) return;
                 if (kind === 'flute') {
                     this.synth.triggerAttackRelease(["E5", "A5", "C6"], "16n");
+                } else if (kind === 'saber') {
+                    this.synth.triggerAttackRelease(["G5", "C6", "E6"], "32n");
                 } else {
                     this.synth.triggerAttackRelease(["G3", "D4"], "16n");
                     if (this.bgmSynth) this.bgmSynth.triggerAttackRelease("C2", "32n");
@@ -839,6 +907,28 @@
             playTap() {
                 if (!GameState.audioInitialized || !this.synth) return;
                 try { this.synth.triggerAttackRelease("C7", "64n"); } catch (e) { /* ignore */ }
+            }
+
+            _trig(synth, notes, dur, delay) {
+                if (!synth) return;
+                try {
+                    const t = (window.Tone && Tone.now) ? Tone.now() + (delay || 0.001) : undefined;
+                    if (t == null) synth.triggerAttackRelease(notes, dur);
+                    else synth.triggerAttackRelease(notes, dur, t);
+                } catch (e) { /* Tone start-time race */ }
+            }
+
+            playBgmSting(theme) {
+                if (!this.synth || !this.bgmSynth) return;
+                const stings = {
+                    school: { notes: ["A3", "E4"], drum: "A2" },
+                    road: { notes: ["D4", "F4"], drum: "D2" },
+                    town: { notes: ["E4", "G4", "B4"], drum: "C3" },
+                    park: { notes: ["C3", "G3"], drum: "C2" }
+                };
+                const sting = stings[theme] || stings.school;
+                this._trig(this.bgmSynth, sting.drum, "8n", 0.02);
+                this._trig(this.synth, sting.notes, "8n", 0.03);
             }
 
             updateMutter(shouldPlay) {
@@ -857,65 +947,30 @@
                 }
             }
 
-            playBgmSting(theme) {
-                if (!this.synth || !this.bgmSynth) return;
-                const stings = {
-                    school: { notes: ["A3", "E4"], drum: "A2" },
-                    road: { notes: ["D4", "F4"], drum: "D2" },
-                    town: { notes: ["E4", "G4", "B4"], drum: "C3" },
-                    park: { notes: ["C3", "G3"], drum: "C2" }
-                };
-                const sting = stings[theme] || stings.school;
-                this.bgmSynth.triggerAttackRelease(sting.drum, "8n");
-                this.synth.triggerAttackRelease(sting.notes, "8n");
-            }
-
-            stopRoadBgm() {
-                if (!this.roadParts) return;
-                try { this.roadParts.loop.stop(); } catch (e) { /* ignore */ }
-                try { this.roadParts.loop.dispose(); } catch (e) { /* ignore */ }
-                try { this.roadParts.bass.dispose(); } catch (e) { /* ignore */ }
-                try { this.roadParts.lead.dispose(); } catch (e) { /* ignore */ }
-                this.roadParts = null;
-            }
-
-            startRoadBgm() {
-                this.stopRoadBgm();
-                if (!window.Tone) return;
-                const bass = new Tone.MembraneSynth().toDestination();
-                bass.volume.value = -18;
-                const lead = new Tone.Synth({ oscillator: { type: 'triangle' } }).toDestination();
-                lead.volume.value = -20;
-                const loop = new Tone.Loop((time) => {
-                    bass.triggerAttackRelease("E2", "8n", time);
-                    lead.triggerAttackRelease("B3", "16n", time + 0.32);
-                    lead.triggerAttackRelease("A3", "16n", time + 0.64);
-                }, "1n");
-                loop.start();
-                this.roadParts = { bass, lead, loop };
-            }
-
             playAreaBgm(area, force) {
-                if (!GameState.audioInitialized) return;
+                if (!GameState.audioInitialized) {
+                    this._pendingArea = area;
+                    return;
+                }
                 const theme = this.areaTheme[area] || 'school';
                 if (!force && theme === this.bgmTheme) return;
+                const next = this.bgm[theme];
                 Object.keys(this.bgm).forEach((key) => {
                     const el = this.bgm[key];
+                    if (el === next) return;
                     el.pause();
-                    el.currentTime = 0;
+                    try { el.currentTime = 0; } catch (e) { /* ignore */ }
                 });
-                this.stopRoadBgm();
                 this.playBgmSting(theme);
-                if (theme === 'road') {
-                    this.startRoadBgm();
-                } else {
-                    const next = this.bgm[theme];
-                    if (next) {
-                        next.currentTime = 0;
-                        next.play().catch(() => {});
-                    }
-                }
                 this.bgmTheme = theme;
+                this._pendingArea = null;
+                this._playing = next;
+                if (!next) return;
+                next.muted = false;
+                next.loop = true;
+                try { next.currentTime = 0; } catch (e) { /* ignore */ }
+                const p = next.play();
+                if (p && p.catch) p.catch(() => { this._pendingArea = area; });
             }
 
             playBreak() {
@@ -937,7 +992,8 @@
                 bgColor: "#3d6b34",
                 bounds: { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT },
                 portals: [
-                    { x: WORLD_WIDTH / 2 - 60, y: WORLD_HEIGHT - 30, w: 120, h: 30, target: 'ROAD', spawnX: WORLD_WIDTH / 2, spawnY: 340, reqQuest: 0 }
+                    { x: WORLD_WIDTH / 2 - 60, y: WORLD_HEIGHT - 30, w: 120, h: 30, target: 'ROAD', spawnX: WORLD_WIDTH / 2, spawnY: 340, reqQuest: 0 },
+                    { x: 736, y: 196, w: 128, h: 88, target: 'SCHOOL_HALL', spawnX: WORLD_WIDTH / 2, spawnY: 920 }
                 ],
                 decorations: [
                     { type: 'school_plaza', x: 200, y: 286, w: 1200, h: 130 },
@@ -965,10 +1021,11 @@
                         id: 'teacher', 
                         name: '担任の先生', 
                         x: 800, 
-                        y: 340,
+                        y: 390,
                         behavior: 'idle_shift',
                         patrolRadius: 55,
                         speed: 0.85,
+                        scale: 1.2,
                         sprite: '👨‍🏫', 
                         dialog: function() {
                             if (player.hp < player.maxHp) {
@@ -986,9 +1043,91 @@
                                 "おお、よく来たな！いま学校の外が大変なことになっているんだ！",
                                 "公園に現れた怪しい影…あれは正気を失った『暗黒校長』だ！",
                                 "校門を出て道路・商店街を抜け、公園の暗黒校長を倒して学校の平和を取り戻してくれ！",
-                                "体力が減ったらここに戻ってくれば、いつでも手当てしてやるぞ！"
+                                "校舎の中の保健の先生にも手当てしてもらえるぞ。体力が減ったら戻ってこい！"
                             ];
                         } 
+                    }
+                ]
+            },
+            SCHOOL_HALL: {
+                name: "北校舎 1F 昇降口",
+                bgColor: "#3f3a32",
+                bounds: { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT },
+                portals: [
+                    { x: 740, y: 1054, w: 120, h: 40, target: 'SCHOOL', spawnX: WORLD_WIDTH / 2, spawnY: 400 }
+                ],
+                decorations: [
+                    { type: 'room_wall', x: 200, y: 100, w: 1200, h: 32 },
+                    { type: 'room_wall', x: 200, y: 1060, w: 540, h: 32 },
+                    { type: 'room_wall', x: 860, y: 1060, w: 540, h: 32 },
+                    { type: 'room_wall', x: 200, y: 100, w: 32, h: 992 },
+                    { type: 'room_wall', x: 1368, y: 100, w: 32, h: 992 },
+                    { type: 'classroom', x: 260, y: 160, w: 220, h: 200 },
+                    { type: 'classroom', x: 500, y: 160, w: 220, h: 200 },
+                    { type: 'classroom', x: 880, y: 160, w: 220, h: 200 },
+                    { type: 'classroom', x: 1120, y: 160, w: 220, h: 200 },
+                    { type: 'bulletin', x: 720, y: 200, w: 160, h: 120 },
+                    { type: 'shoe_locker', x: 280, y: 720, w: 360, h: 90 },
+                    { type: 'shoe_locker', x: 960, y: 720, w: 360, h: 90 },
+                    { type: 'fountain_box', x: 760, y: 480, w: 80, h: 70 }
+                ],
+                npcs: [
+                    {
+                        id: 'hall_nurse',
+                        name: '保健の先生',
+                        x: 610,
+                        y: 400,
+                        behavior: 'idle_shift',
+                        patrolRadius: 36,
+                        speed: 0.55,
+                        scale: 1.22,
+                        sprite: '👩‍⚕️',
+                        dialog: function() {
+                            if (player.hp < player.maxHp || player.sp < player.maxSp) {
+                                player.hp = player.maxHp;
+                                player.sp = player.maxSp;
+                                updateHUD();
+                                vfxManager.addDamageText(player.x, player.y - 30, 'HP/SP全回復!', '#4ade80');
+                                audio.playLevelUp();
+                                return [
+                                    "あら、顔色が悪いわ。こっちに来て。",
+                                    "（保健の先生に診てもらい、HPとSPが全回復した！）",
+                                    "無理はしなくていいのよ。また具合が悪くなったら、ここに来なさい。"
+                                ];
+                            }
+                            return [
+                                "放課後なのに、まだ校舎にいるのね。",
+                                "大丈夫？ 休むなら、私の前で休んでいいわよ。"
+                            ];
+                        }
+                    },
+                    {
+                        id: 'janitor',
+                        name: '用務員さん',
+                        x: 420,
+                        y: 640,
+                        behavior: 'pace_h',
+                        patrolRadius: 70,
+                        speed: 0.7,
+                        sprite: '🧹',
+                        dialog: [
+                            "下駄箱は放課後に直すんだ。踏むなよ。",
+                            "公園の様子がおかしいらしい。校門から東へ行け。"
+                        ]
+                    },
+                    {
+                        id: 'hall_student',
+                        name: '残りの生徒',
+                        x: 1120,
+                        y: 640,
+                        behavior: 'idle_shift',
+                        patrolRadius: 48,
+                        speed: 0.9,
+                        sprite: '🎒',
+                        dialog: [
+                            "僕は下駄箱の整理…先生はグラウンドにいるよ。",
+                            "教室はもう施錠されてる。昇降口から出て行って。"
+                        ]
                     }
                 ]
             },
@@ -1015,7 +1154,38 @@
                     { type: 'tree', x: 1440, y: 420 }
                 ],
                 npcs: [
-                    { id: 'cat', name: '街の野良猫', x: 220, y: 560, sprite: '🐈', behavior: 'wander', patrolRadius: 110, speed: 1.6, dialog: ["ニャー（東の商店街で美味しい焼きそばパンが売ってるニャ）"] }
+                    { id: 'cat', name: '街の野良猫', x: 220, y: 560, sprite: '🐈', behavior: 'wander', patrolRadius: 110, speed: 1.6, dialog: ["ニャー（東の商店街で美味しい焼きそばパンが売ってるニャ）"] },
+                    {
+                        id: 'isekai_frog',
+                        name: '旅のカエル',
+                        x: 1260,
+                        y: 640,
+                        behavior: 'hop',
+                        patrolRadius: 150,
+                        hopHeight: 38,
+                        scale: 1.15,
+                        sprite: '🐸',
+                        dialog: [
+                            "ケロッ…ここは『通学路』という異世界か。",
+                            "車が来ないのに道路だけ広い。不思議ケロ。",
+                            "東のゲームセンターに、私の故郷に似た筐体があるらしいケロ。"
+                        ]
+                    },
+                    {
+                        id: 'traffic_uncle',
+                        name: '交通整理のおじさん',
+                        x: 560,
+                        y: 510,
+                        behavior: 'direct',
+                        patrolRadius: 18,
+                        scale: 1.1,
+                        sprite: '🚦',
+                        dialog: [
+                            "おい、横断歩道は走んな！左右を見てから渡れ。",
+                            "東が商店街だ。自転車の生徒が多いから気をつけろよ。",
+                            "信号より、俺の誘導棒を見ろ。止まってるときは止まるんだ。"
+                        ]
+                    }
                 ]
             },
             SHOPPING: {
@@ -1038,11 +1208,16 @@
                     { type: 'lantern', x: 1240, y: 360 }
                 ],
                 npcs: [
-                    { id: 'shopper_auntie', name: '買い物のおばさん', x: 360, y: 520, behavior: 'shopper', patrolRadius: 520, speed: 1.35, dialog: ["パン屋の焼きそばパン、今日も行列よ。"] },
-                    { id: 'shopper_auntie2', name: '特売狙いのおばさん', x: 1100, y: 610, behavior: 'shopper', patrolRadius: 480, speed: 1.15, dialog: ["駄菓子屋のくじ、大当たりが出た人を見たのよ。"] },
-                    { id: 'shopper_grandpa', name: '散歩の爺さん', x: 700, y: 560, behavior: 'shopper', patrolRadius: 400, speed: 0.7, dialog: ["この通りは夕方になると人が増えてな。"] },
-                    { id: 'shopper_child', name: '駄菓子目当ての子供', x: 480, y: 700, behavior: 'shopper', patrolRadius: 300, speed: 1.85, dialog: ["ゲームセンターのインベーダー、僕もやりたい！"] },
-                    { id: 'shopper_child2', name: '駆け回る子供', x: 980, y: 740, behavior: 'shopper', patrolRadius: 260, speed: 2.05, dialog: ["滑り台は公園だよ。こっちはお店！"] }
+                    { id: 'queue_auntie', name: '行列のおばさん', x: 242, y: 412, facing: 'up', behavior: 'queue', dialog: ["焼きそばパン、あと少しらしいのよ。"] },
+                    { id: 'queue_student', name: '部活帰りの生徒', x: 400, y: 412, facing: 'up', behavior: 'queue', dialog: ["部活終わりに並ぶのが日課なんだ。"] },
+                    { id: 'queue_grandpa', name: '行列のおじいさん', x: 406, y: 458, facing: 'up', behavior: 'queue', dialog: ["小麦亭はな、昔からこの味だよ。"] },
+                    { id: 'queue_child', name: 'お腹を空かせた子ども', x: 398, y: 504, facing: 'up', behavior: 'queue', dialog: ["ママ、まだー？ パンまだー？"] },
+                    { id: 'queue_lady', name: '特売のおばさん', x: 404, y: 550, facing: 'up', behavior: 'queue', dialog: ["1万円貯めたら店主が何かくれるって、掲示板に書いてあったわよ。"] },
+                    { id: 'queue_office', name: '会社帰り', x: 400, y: 596, facing: 'up', behavior: 'queue', dialog: ["並んでる途中で、入口から入れるよ。横からどうぞ。"] },
+                    { id: 'shopper_auntie2', name: '通りがかりのおばさん', x: 1100, y: 610, behavior: 'shopper', patrolRadius: 480, speed: 1.15, dialog: ["パン屋、今日も行列ね。駄菓子屋のくじも人気よ。"] },
+                    { id: 'shopper_grandpa', name: '散歩の爺さん', x: 900, y: 720, behavior: 'shopper', patrolRadius: 360, speed: 0.7, dialog: ["小麦亭の前は、夕方になると人が増えてな。"] },
+                    { id: 'shopper_child', name: '駄菓子目当ての子供', x: 620, y: 740, behavior: 'shopper', patrolRadius: 280, speed: 1.85, dialog: ["ゲームセンターのインベーダー、僕もやりたい！"] },
+                    { id: 'shopper_child2', name: '駆け回る子供', x: 1080, y: 760, behavior: 'shopper', patrolRadius: 240, speed: 2.05, dialog: ["滑り台は公園だよ。こっちはお店！"] }
                 ]
             },
             BAKERY: {
@@ -1148,12 +1323,16 @@
                     rects.push({ x: doorX + doorW, y: top + bodyH - 30, w: dec.x + dec.w - 8 - doorX - doorW, h: 30 });
                 } else if (dec.type === 'room_wall' || dec.type === 'counter' || dec.type === 'oven' || dec.type === 'cabinet') {
                     rects.push({ x: dec.x, y: dec.y, w: dec.w, h: dec.h });
+                } else if (dec.type === 'classroom' || dec.type === 'shoe_locker' || dec.type === 'bulletin' || dec.type === 'fountain_box') {
+                    rects.push({ x: dec.x, y: dec.y, w: dec.w, h: dec.h });
                 } else if (dec.type === 'kuji' || dec.type === 'invader_cab') {
                     rects.push({ x: dec.x + 16, y: dec.y + 20, w: dec.w - 32, h: dec.h - 40 });
                 } else if (dec.type === 'tree' || dec.type === 'cherry_tree') {
                     rects.push({ x: dec.x - 22, y: dec.y - 10, w: 44, h: 28 });
                 } else if (dec.type === 'fountain') {
-                    rects.push({ x: dec.x - dec.r * 0.75, y: dec.y - dec.r * 0.35, w: dec.r * 1.5, h: dec.r * 0.9 });
+                    const rx = dec.r * 1.14;
+                    const ry = dec.r * 0.46;
+                    rects.push({ x: dec.x - rx, y: dec.y - ry * 0.35, w: rx * 2, h: ry * 1.45 });
                 } else if (dec.type === 'road_grass') {
                     if (dec.walkW) {
                         rects.push({ x: dec.x, y: dec.y, w: dec.walkX - dec.x, h: dec.h });
@@ -1260,7 +1439,13 @@
             }
 
             cycleWeapon() {
-                GameState.weapon = GameState.weapon === 'yoyo' ? 'flute' : 'yoyo';
+                const list = GameState.ownedWeapons || ['yoyo'];
+                if (list.length < 2) {
+                    showNotification('まだ武器は一つ');
+                    return;
+                }
+                const i = Math.max(0, list.indexOf(GameState.weapon));
+                GameState.weapon = list[(i + 1) % list.length];
                 const w = CombatKit.weaponOf(GameState.weapon);
                 showNotification(w.name);
                 updateHUD();
@@ -1309,6 +1494,8 @@
                         }
                     } else if (GameState.weapon === 'flute') {
                         this.animationState = 'flute_play';
+                    } else if (GameState.weapon === 'saber') {
+                        this.animationState = 'yoyo_throw';
                     } else {
                         this.animationState = 'yoyo_throw';
                     }
@@ -1415,7 +1602,7 @@
                 audio.playWeapon(w.sfx);
                 const origin = CombatKit.fireSkill(w.id, this, projectiles);
                 vfxManager.addNova(origin.x, origin.y);
-                if (w.id === 'yoyo') camera.zoomTo(1.18, 16);
+                if (w.id === 'yoyo' || w.id === 'saber') camera.zoomTo(1.18, 16);
             }
 
             takeDamage(amount) {
@@ -1431,13 +1618,21 @@
 
                 comboRank.reset();
                 if (this.hp <= 0) {
-                    showNotification("学校へ戻った");
+                    showNotification("倒れて保健室前に運ばれた");
                     this.hp = this.maxHp;
                     this.sp = Math.max(this.sp, 20);
-                    GameState.currentArea = 'SCHOOL';
-                    this.x = WORLD_WIDTH / 2;
-                    this.y = WORLD_HEIGHT / 2;
-                    audio.playAreaBgm('SCHOOL');
+                    this.iFrames = 60;
+                    GameState.currentArea = 'SCHOOL_HALL';
+                    this.x = 610;
+                    this.y = 430;
+                    applyMapCollision(this, 'SCHOOL_HALL');
+                    const view = cssView();
+                    camera.x = this.x - view.w / (2 * camera.zoom);
+                    camera.y = this.y - view.h / (2 * camera.zoom);
+                    camera.shakeAmount = 0;
+                    projectiles.live.forEach((p) => { p.life = 0; });
+                    audio.playAreaBgm('SCHOOL_HALL');
+                    updateHUD();
                 }
             }
 
@@ -1452,7 +1647,7 @@
                     this.hp = this.maxHp;
                     this.atk += 5;
                     this.def += 2;
-                    audio.playLevelUp();
+                    audio.playLevelFanfare();
                     showNotification(`LEVEL UP! Lv.${this.level} に上がった！`);
                 }
             }
@@ -1521,6 +1716,76 @@
                 this.animTimer = Math.random() * 100;
                 this.isMoving = false;
                 this.paceDir = 1;
+                this.hopPhase = 'idle';
+                this.hopT = 0;
+                this.hopLift = 0;
+                this.hopFromX = def.x;
+                this.hopFromY = def.y;
+            }
+
+            pickHopTarget() {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 40 + Math.random() * 72;
+                let tx = this.homeX + Math.cos(angle) * dist;
+                let ty = this.homeY + Math.sin(angle) * dist;
+                const hx = tx - this.homeX;
+                const hy = ty - this.homeY;
+                const span = Math.hypot(hx, hy);
+                if (span > this.patrolRadius && span > 0) {
+                    tx = this.homeX + hx / span * this.patrolRadius;
+                    ty = this.homeY + hy / span * this.patrolRadius;
+                }
+                this.targetX = Math.max(80, Math.min(1520, tx));
+                this.targetY = Math.max(320, Math.min(980, ty));
+            }
+
+            updateHop() {
+                if (this.hopPhase === 'idle') {
+                    this.isMoving = false;
+                    this.hopLift = 0;
+                    this.stateTimer--;
+                    if (this.stateTimer <= 0) {
+                        this.pickHopTarget();
+                        this.hopPhase = 'crouch';
+                        this.stateTimer = 12;
+                    }
+                    return;
+                }
+                if (this.hopPhase === 'crouch') {
+                    this.isMoving = false;
+                    this.hopLift = 0;
+                    this.stateTimer--;
+                    if (this.stateTimer <= 0) {
+                        this.hopFromX = this.x;
+                        this.hopFromY = this.y;
+                        this.hopPhase = 'air';
+                        this.hopT = 0;
+                        this.updateFacing(this.targetX - this.x, this.targetY - this.y);
+                    }
+                    return;
+                }
+                if (this.hopPhase === 'air') {
+                    this.isMoving = true;
+                    this.hopT += 1 / 16;
+                    const t = Math.min(1, this.hopT);
+                    this.x = this.hopFromX + (this.targetX - this.hopFromX) * t;
+                    this.y = this.hopFromY + (this.targetY - this.hopFromY) * t;
+                    this.hopLift = Math.sin(t * Math.PI) * (this.def.hopHeight || 34);
+                    applyMapCollision(this, this.area);
+                    if (t >= 1) {
+                        this.hopPhase = 'land';
+                        this.stateTimer = 8;
+                        this.hopLift = 0;
+                    }
+                    return;
+                }
+                this.isMoving = false;
+                this.hopLift = 0;
+                this.stateTimer--;
+                if (this.stateTimer <= 0) {
+                    this.hopPhase = 'idle';
+                    this.stateTimer = 20 + Math.random() * 40;
+                }
             }
 
             pickNewTarget() {
@@ -1548,6 +1813,46 @@
             }
 
             getAnim() {
+                if (this.behavior === 'hop') {
+                    if (this.hopPhase === 'crouch') {
+                        const k = 1 - this.stateTimer / 12;
+                        return { bob: 0, squash: 1 - 0.3 * k, squashX: 1 + 0.22 * k, hopLift: 0 };
+                    }
+                    if (this.hopPhase === 'air') {
+                        const t = Math.min(1, this.hopT);
+                        const stretch = t < 0.18 ? 1.2 : (t > 0.82 ? 1.06 : 1.12);
+                        const thin = t < 0.18 ? 0.84 : 0.92;
+                        return { bob: 0, squash: stretch, squashX: thin, hopLift: this.hopLift };
+                    }
+                    if (this.hopPhase === 'land') {
+                        const k = this.stateTimer / 8;
+                        return { bob: 0, squash: 0.72 + 0.28 * (1 - k), squashX: 1.22 - 0.22 * (1 - k), hopLift: 0 };
+                    }
+                    return {
+                        bob: Math.sin(this.animTimer * 0.08) * 1.1,
+                        squash: 1 + Math.sin(this.animTimer * 0.08) * 0.02,
+                        squashX: 1,
+                        hopLift: 0
+                    };
+                }
+                if (this.behavior === 'direct') {
+                    const wave = Math.sin(this.animTimer * 0.22);
+                    return {
+                        bob: Math.abs(wave) * 1.4,
+                        squash: 1 + wave * 0.03,
+                        squashX: 1 + wave * 0.08,
+                        hopLift: 0
+                    };
+                }
+                if (this.behavior === 'queue') {
+                    const fidget = Math.sin(this.animTimer * 0.11 + this.homeX * 0.02);
+                    return {
+                        bob: fidget * 1.1,
+                        squash: 1 + fidget * 0.025,
+                        squashX: 1,
+                        hopLift: 0
+                    };
+                }
                 const bob = this.isMoving
                     ? Math.sin(this.animTimer * 0.38) * 3.2
                     : Math.sin(this.animTimer * 0.09) * 1.4;
@@ -1563,6 +1868,38 @@
 
                 if (GameState.dialogActive) {
                     this.isMoving = false;
+                    return;
+                }
+
+                if (this.behavior === 'hop') {
+                    this.updateHop();
+                    return;
+                }
+
+                if (this.behavior === 'direct') {
+                    this.isMoving = false;
+                    this.stateTimer--;
+                    if (this.stateTimer <= 0) {
+                        this.facing = this.facing === 'left' ? 'right' : 'left';
+                        this.stateTimer = 36 + Math.random() * 28;
+                    }
+                    return;
+                }
+
+                if (this.behavior === 'queue') {
+                    this.isMoving = false;
+                    this.stateTimer--;
+                    this.x = this.homeX + Math.sin(this.animTimer * 0.04) * 1.6;
+                    this.y = this.homeY;
+                    if (this.stateTimer <= 0) {
+                        if (this.facing === 'up') {
+                            this.facing = Math.random() < 0.5 ? 'left' : 'right';
+                            this.stateTimer = 18 + Math.random() * 16;
+                        } else {
+                            this.facing = 'up';
+                            this.stateTimer = 48 + Math.random() * 36;
+                        }
+                    }
                     return;
                 }
 
@@ -1600,15 +1937,21 @@
             draw(ctx) {
                 if (this.area !== GameState.currentArea) return;
                 const anim = this.getAnim();
+                anim.scale = this.def.scale || 1;
                 const flipOverride = this.def.id === 'cat' ? true : null;
-                const h = drawCharArt(ctx, this.def.id, this.x, this.y, this.facing, flipOverride, anim);
+                let h;
+                if (this.def.id === 'hall_nurse' && typeof ParkVectors !== 'undefined' && ParkVectors.drawNurse) {
+                    h = ParkVectors.drawNurse(ctx, this, anim);
+                } else {
+                    h = drawCharArt(ctx, this.def.id, this.x, this.y, this.facing, flipOverride, anim);
+                }
 
                 ctx.save();
                 ctx.fillStyle = '#ffffff';
                 ctx.font = 'bold 12px sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
-                ctx.fillText(this.def.name, this.x, this.y - h - 6 + (anim.bob || 0));
+                ctx.fillText(this.def.name, this.x, this.y - h - 6 + (anim.bob || 0) - (anim.hopLift || 0));
                 ctx.restore();
             }
         }
@@ -1859,6 +2202,14 @@
             });
 
             if (keys['KeyE'] || keys['InteractTrigger']) {
+                if (GameState.currentArea === 'SCHOOL_HALL') {
+                    const board = currentMap.decorations.find((d) => d.type === 'bulletin');
+                    if (board && distToBulletin(board) < 140) {
+                        keys['KeyE'] = false;
+                        keys['InteractTrigger'] = false;
+                        readBulletin();
+                    }
+                }
                 if (GameState.currentArea === 'DAGASHI') {
                     const kuji = currentMap.decorations.find((d) => d.type === 'kuji');
                     if (kuji && Math.hypot(player.x - (kuji.x + kuji.w / 2), player.y - (kuji.y + kuji.h / 2)) < 140) {
@@ -1895,6 +2246,9 @@
                 if (dist < CHAR_TALK_RANGE && (keys['KeyE'] || keys['InteractTrigger'])) {
                     keys['KeyE'] = false;
                     keys['InteractTrigger'] = false;
+                    if (npc.id === 'bakery_owner' && tryGiveBeamSaber(npc)) {
+                        return;
+                    }
                     if (npc.shopItem) {
                         if (GameState.money >= npc.price) {
                             GameState.money -= npc.price;
@@ -1903,6 +2257,11 @@
                             else GameState.inventory.push({ id: 'yakisoba_pan', name: '焼きそばパン', count: 1, icon: '🥖', hpRestore: 40, desc: 'HPを40回復。' });
                             showNotification("焼きそばパン");
                             updateHUD();
+                        } else if (npc.id === 'bakery_owner' && !GameState.hasSaber) {
+                            showDialog(npc.name, [
+                                'いらっしゃい。焼きそばパンは50円だ。',
+                                '1万円貯めたら、倉庫の奥の一品を渡すよ。今は' + GameState.money + '円だな。'
+                            ]);
                         } else {
                             showNotification("足りない");
                         }
@@ -1912,6 +2271,44 @@
                     }
                 }
             });
+        }
+
+        function distToBulletin(board) {
+            const cx = board.x + board.w / 2;
+            const cy = board.y + board.h;
+            return Math.hypot(player.x - cx, player.y - cy);
+        }
+
+        function readBulletin() {
+            if (GameState.hasSaber) {
+                showDialog('掲示板', [
+                    '【お知らせ】小麦亭の店主より',
+                    'ビームサーベルは受け取ったあとに、武器ボタンで切り替えられる。',
+                    '公園の校長にも効くらしい。'
+                ]);
+                return;
+            }
+            showDialog('掲示板', [
+                '【お知らせ】小麦亭の店主より',
+                '1万円貯めた生徒には、倉庫の奥の一品を渡す。',
+                '受け取ったあとは、武器の切り替えができるようになるそうだ。'
+            ]);
+        }
+
+        function tryGiveBeamSaber(npc) {
+            if (GameState.hasSaber) return false;
+            if (GameState.money < 10000) return false;
+            GameState.hasSaber = true;
+            if (GameState.ownedWeapons.indexOf('saber') < 0) GameState.ownedWeapons.push('saber');
+            GameState.weapon = 'saber';
+            audio.playLevelUp();
+            updateHUD();
+            showDialog(npc.name, [
+                '1万円も貯めたのか！たいしたもんだ。',
+                'これ、ビームサーベルだ。古いが、ちゃんと光るぜ。',
+                '武器ボタンでヨーヨーと切り替えられる。公園の校長にも効くぞ。'
+            ]);
+            return true;
         }
 
         function grantItem(id) {
@@ -2022,6 +2419,7 @@
             // クエストトラッカー更新
             const questTexts = {
                 SCHOOL: "校門",
+                SCHOOL_HALL: "出口",
                 ROAD: "商店街",
                 SHOPPING: "公園",
                 BAKERY: "出口",
@@ -2140,7 +2538,10 @@
             if (e.target.closest('[data-scrollable]')) return;
             e.preventDefault();
         }, { passive: false });
-        document.addEventListener('pointerdown', () => audio.init(), { once: true });
+        document.addEventListener('pointerdown', () => {
+            audio.init();
+            audio.resumeBgm();
+        });
         document.addEventListener('keydown', () => audio.init(), { once: true });
 
         function bindTap(el, handler) {
@@ -2372,12 +2773,12 @@
             ctx.fillRect(x + 10, y + h - 12, w - 20, 8);
 
             const inset = 28;
-            const bar = 8;
-            const gap = 6;
+            const bar = 44;
+            const gap = 28;
             const top = y + 18;
-            const bottom = y + h - 18;
-            for (let sy = top; sy + bar <= bottom; sy += bar + gap) {
-                ctx.fillRect(x + inset, sy, w - inset * 2, bar);
+            const zh = h - 36;
+            for (let sx = x + inset; sx + bar <= x + w - inset; sx += bar + gap) {
+                ctx.fillRect(sx | 0, top | 0, bar, zh | 0);
             }
         }
 
@@ -2452,6 +2853,73 @@
             ctx.strokeStyle = '#92400e';
             ctx.lineWidth = 6;
             ctx.strokeRect(dec.x, dec.y, dec.w, dec.h);
+        }
+
+        function drawFountain(ctx, dec) {
+            const x = dec.x | 0;
+            const y = dec.y | 0;
+            const rx = ((dec.r || 88) * 1.14) | 0;
+            const ry = ((dec.r || 88) * 0.46) | 0;
+            const t = performance.now() / 150;
+
+            function oval(cx, cy, orx, ory, color) {
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.ellipse(cx, cy, orx | 0, ory | 0, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            oval(x, y + 10, rx + 18, ry + 12, '#1e293b');
+            oval(x, y + 6, rx + 12, ry + 8, '#44403c');
+            oval(x, y + 3, rx + 8, ry + 5, '#78716c');
+            oval(x, y, rx, ry, '#a8a29e');
+            oval(x, y - 2, rx - 8, ry - 6, '#d6d3d1');
+            oval(x, y, rx - 14, ry - 10, '#292524');
+            oval(x, y - 1, rx - 18, ry - 13, '#1e3a8a');
+            oval(x, y - 3, rx - 26, ry - 17, '#2563eb');
+            oval(x, y - 5, rx - 38, ry - 22, '#38bdf8');
+
+            ctx.fillStyle = '#e0f2fe';
+            for (let i = 0; i < 6; i++) {
+                const a = t * 0.7 + i * 1.05;
+                const px = x + Math.cos(a) * (rx - 36);
+                const py = y - 4 + Math.sin(a * 1.35) * (ry - 24);
+                ctx.fillRect(px | 0, py | 0, 5, 2);
+            }
+
+            ctx.fillStyle = '#78716c';
+            ctx.fillRect(x - 12, y - 34, 24, 30);
+            ctx.fillStyle = '#a8a29e';
+            ctx.fillRect(x - 10, y - 34, 8, 30);
+            ctx.fillStyle = '#d6d3d1';
+            ctx.fillRect(x - 8, y - 34, 3, 30);
+            oval(x, y - 38, 26, 11, '#78716c');
+            oval(x, y - 40, 20, 8, '#a8a29e');
+            oval(x, y - 41, 14, 5, '#38bdf8');
+
+            const jets = [
+                { dx: 0, h: 54 },
+                { dx: -14, h: 42 },
+                { dx: 14, h: 42 },
+                { dx: -26, h: 30 },
+                { dx: 26, h: 30 }
+            ];
+            jets.forEach((j, i) => {
+                const h = j.h + Math.sin(t + i * 0.9) * 9;
+                const lean = j.dx * (0.42 + Math.sin(t * 0.65 + i) * 0.07);
+                for (let s = 0; s < 7; s++) {
+                    const p = s / 7;
+                    const jx = x + lean * p;
+                    const jy = y - 42 - h * p;
+                    const w = 4 - ((p * 2) | 0);
+                    ctx.fillStyle = p < 0.25 ? '#f8fafc' : (p < 0.6 ? '#e0f2fe' : '#7dd3fc');
+                    ctx.fillRect((jx - w / 2) | 0, jy | 0, Math.max(2, w), 5);
+                }
+                const fall = ((t * 16 + i * 13) % 32);
+                ctx.fillStyle = '#bae6fd';
+                ctx.fillRect((x + j.dx + lean * 0.7) | 0, (y - 40 - h + fall) | 0, 3, 4);
+                ctx.fillRect((x + j.dx * 1.35) | 0, (y - 18 + ((fall * 0.8) % 20)) | 0, 2, 3);
+            });
         }
 
         function drawSwing(ctx, dec) {
@@ -2529,6 +2997,9 @@
             if (areaKey === 'SCHOOL' && SchoolMap && SchoolMap.drawYard) {
                 SchoolMap.drawYard(ctx, WORLD_WIDTH, WORLD_HEIGHT);
             }
+            if (areaKey === 'SCHOOL_HALL' && SchoolMap && SchoolMap.drawHall) {
+                SchoolMap.drawHall(ctx, WORLD_WIDTH, WORLD_HEIGHT);
+            }
             if (ShopKit && ShopKit.drawInterior) ShopKit.drawInterior(ctx, areaKey, WORLD_WIDTH, WORLD_HEIGHT);
 
             area.decorations.forEach((dec) => {
@@ -2564,17 +3035,7 @@
                     ctx.arc(dec.x + 16, dec.y - 22, 16, 0, Math.PI * 2);
                     ctx.fill();
                 } else if (dec.type === 'fountain') {
-                    ctx.fillStyle = '#64748b';
-                    ctx.beginPath();
-                    ctx.arc(dec.x, dec.y, dec.r + 8, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.fillStyle = '#38bdf8';
-                    ctx.beginPath();
-                    ctx.arc(dec.x, dec.y, dec.r, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = 6;
-                    ctx.stroke();
+                    drawFountain(ctx, dec);
                 } else if (dec.type === 'traffic_light') {
                     drawTrafficLight(ctx, dec);
                 } else if (dec.type === 'bench') {
@@ -2636,6 +3097,7 @@
 
         const GUIDE_PRIMARY = {
             SCHOOL: 'ROAD',
+            SCHOOL_HALL: 'SCHOOL',
             ROAD: 'SHOPPING',
             SHOPPING: 'PARK',
             BAKERY: 'SHOPPING',
@@ -2741,6 +3203,16 @@
                     best = { kind: 'npc' };
                 }
             });
+            if (area === 'SCHOOL_HALL') {
+                const board = map.decorations.find((d) => d.type === 'bulletin');
+                if (board) {
+                    const d = distToBulletin(board);
+                    if (d < 140 && d < bestD) {
+                        bestD = d;
+                        best = { kind: 'board' };
+                    }
+                }
+            }
             if (area === 'DAGASHI') {
                 const kuji = map.decorations.find((d) => d.type === 'kuji');
                 if (kuji) {
@@ -2769,6 +3241,7 @@
             if (btn) btn.classList.toggle('is-ready', !!hit);
             if (cap) {
                 if (!hit) cap.textContent = '話す';
+                else if (hit.kind === 'board') cap.textContent = '見る';
                 else if (hit.kind === 'kuji') cap.textContent = 'くじ';
                 else if (hit.kind === 'game') cap.textContent = '遊ぶ';
                 else if (hit.kind === 'quit') cap.textContent = 'やめる';
@@ -2862,8 +3335,8 @@
 
         // スタートボタン処理
         bindTap(document.getElementById('start-btn'), () => {
-            audio.init();
             GameState.started = true;
+            audio.init();
             audio.playAreaBgm(GameState.currentArea, true);
             document.getElementById('start-overlay').classList.add('hidden');
         });
