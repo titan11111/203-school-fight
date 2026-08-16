@@ -117,7 +117,7 @@ CSSは `index.html` 内。SEは Tone.js（CDN）。BGMは `audio/bgm-*.m4a`。
 - 開始タップで unlock。
 - BGM 4本: 学校=`bgm-skeletons` / 路上=`bgm-road` / 商店街・店内=`bgm-lantern` / 公園=`bgm-showdown`
 - テーマが変わるときだけカットイン（旧曲停止→スティング→新曲を頭から）。店内は商店街のまま。
-- 攻撃SE: Tone.js（Web Audio）。攻撃時に曲を重ねない。ボスつぶやき: mutter（PARK）。
+- 攻撃SE: Tone.js（Web Audio）。攻撃時に曲を重ねない。ボスつぶやき: mutter（PARK、音量0.38。公園BGMは0.52→0.42へ少し下げる）。
 - 武器・必殺は `CombatKit.WEAPONS` のデータ駆動。
 
 ## 10. 保存

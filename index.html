@@ -795,10 +795,13 @@
                 this.fanfareSynth = null;
                 this.loop = null;
                 this.voices = {
-                    mutter: this.makeClip('audio/voice-mutter.m4a', 0.22)
+                    mutter: this.makeClip('audio/voice-mutter.m4a', 0.38)
                 };
                 this.voices.mutter.loop = true;
                 this.mutterOn = false;
+                this.mutterVol = 0.38;
+                this.parkVol = 0.52;
+                this.parkDuckVol = 0.42;
                 this.bgm = {
                     school: this.makeClip('audio/bgm-skeletons.m4a', 0.46),
                     road: this.makeClip('audio/bgm-road.m4a', 0.48),
@@ -997,15 +1000,22 @@
                 if (!el || !GameState.audioInitialized) return;
                 if (shouldPlay) {
                     if (!this.mutterOn) {
-                        el.volume = 0.22;
+                        el.volume = this.mutterVol;
                         el.play().catch(() => {});
                         this.mutterOn = true;
+                        this.setParkDuck(true);
                     }
                 } else if (this.mutterOn) {
                     el.pause();
                     el.currentTime = 0;
                     this.mutterOn = false;
+                    this.setParkDuck(false);
                 }
+            }
+
+            setParkDuck(on) {
+                if (!this.bgm.park) return;
+                this.bgm.park.volume = on ? this.parkDuckVol : this.parkVol;
             }
 
             playAreaBgm(area, force) {
@@ -1029,6 +1039,8 @@
                 if (!next) return;
                 next.muted = false;
                 next.loop = true;
+                if (theme === 'park' && this.mutterOn) this.setParkDuck(true);
+                else this.setParkDuck(false);
                 try { next.currentTime = 0; } catch (e) { /* ignore */ }
                 const p = next.play();
                 if (p && p.catch) p.catch(() => { this._pendingArea = area; });
