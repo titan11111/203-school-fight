@@ -611,7 +611,8 @@
             hasSaber: false,
             bossPhase: 1,
             minigame: null,
-            ending: false
+            ending: false,
+            debugHitboxes: /(?:^|[?&])debugHit=1(?:&|$)/.test(location.search)
         };
         window.GameState = GameState;
 

@@ -15,6 +15,102 @@
         return { x: 0, y: 1 };
     }
 
+    function facingAngle(facing) {
+        if (facing === 'left') return Math.PI;
+        if (facing === 'up') return -Math.PI / 2;
+        if (facing === 'down') return Math.PI / 2;
+        return 0;
+    }
+
+    /** 円×円。中心 (px,py) 半径 pr と敵中心 (ex,ey) 半径 er */
+    function circleHitsCircle(px, py, pr, ex, ey, er) {
+        return Math.hypot(ex - px, ey - py) < er + pr;
+    }
+
+    /** 向き付きビーム（中心 p.x,p.y・長さ beamLen・幅 beamWidth）× 敵円 */
+    function beamHitsCircle(p, ex, ey, er) {
+        const len = p.beamLen || 56;
+        const halfW = (p.beamWidth != null ? p.beamWidth : 20) / 2;
+        const ang = facingAngle(p.facing);
+        const cos = Math.cos(ang);
+        const sin = Math.sin(ang);
+        const dx = ex - p.x;
+        const dy = ey - p.y;
+        const localX = dx * cos + dy * sin;
+        const localY = -dx * sin + dy * cos;
+        const halfLen = len / 2;
+        if (localX < -halfLen - er || localX > halfLen + er) return false;
+        return Math.abs(localY) <= halfW + er;
+    }
+
+    function projectileHitsEnemy(p, enemy) {
+        if (p.kind === 'saber' || p.hitShape === 'beam') {
+            return beamHitsCircle(p, enemy.x, enemy.y, enemy.radius);
+        }
+        return circleHitsCircle(p.x, p.y, p.radius, enemy.x, enemy.y, enemy.radius);
+    }
+
+    /**
+     * 武器ごとの当たり判定定義（表示・コードの正本）。
+     * 座標はすべてワールド px。敵は円 (enemy.x, enemy.y, enemy.radius)。
+     */
+    const HIT_PROFILES = {
+        yoyo: {
+            normal: {
+                shape: 'circle',
+                radius: 14,
+                origin: 'muzzle(yoyo) + 20px 向き方向',
+                motion: 'out: 9px/frame → life45%で return → 手元へ 11px/frame',
+                multiHit: '1投射体あたり敵1体1回（hitIds）。往路・復路は別投射体',
+                onHit: 'phase=out なら即 return'
+            },
+            skill: {
+                shape: 'circle',
+                radius: 18,
+                origin: '手元 muzzle(yoyo)',
+                motion: '半径78pxの円周を28F回転',
+                multiHit: '8Fごとに hitIds リセット（同一敵に複数ヒット可）',
+                pull: true
+            }
+        },
+        flute: {
+            normal: {
+                shape: 'circle',
+                radiusByCombo: [11, 13, 15],
+                origin: 'muzzle(flute)+28px（口元+11px下）',
+                motion: '7+combo px/frame 直進、life 42F',
+                multiHit: '1音符あたり敵1体1回'
+            },
+            skill: {
+                shape: 'circle',
+                radius: 12,
+                count: 8,
+                origin: '口元 muzzle(flute)',
+                motion: '全方向 6.5px/frame、life 36F',
+                multiHit: '1音符あたり敵1体1回'
+            }
+        },
+        saber: {
+            normal: {
+                shape: 'beam',
+                beamLenByCombo: [56, 66, 76],
+                beamWidth: 20,
+                origin: 'muzzle(saber)+22px から reach×0.45 先',
+                motion: '3px/frame 向き方向、life 11F',
+                multiHit: '1斬撃あたり敵1体1回',
+                note: '判定は矩形ビーム。旧実装の円 radius は使わない'
+            },
+            skill: {
+                shape: 'beam',
+                beamLen: 92,
+                beamWidth: 20,
+                origin: 'muzzle(saber) + 36px 向き方向',
+                motion: '14px/frame、life 22F',
+                multiHit: '1斬撃あたり敵1体1回'
+            }
+        }
+    };
+
     // 足元原点。下向きスプライトは頭まで約74pxなので、88だと頭上になる
     // フルートは口元から、さらに約2mm（iPhone論理幅で11px）下げる
     const FLUTE_DROP = 11;
@@ -105,12 +201,14 @@
                 vy: dir.y * 3,
                 life: 11,
                 kind: 'saber',
-                radius: 22 + comboStep * 3,
+                hitShape: 'beam',
+                radius: 0,
                 damage: Math.floor(player.atk * (1.15 + comboStep * 0.28)),
                 poise: 12 + comboStep * 5,
                 owner: 'player',
                 facing: player.facing,
-                beamLen: reach
+                beamLen: reach,
+                beamWidth: 20
             });
             return w;
         }
@@ -165,12 +263,14 @@
                 vy: dir.y * 14,
                 life: 22,
                 kind: 'saber',
-                radius: 20,
+                hitShape: 'beam',
+                radius: 0,
                 damage: Math.floor(player.atk * 1.85),
                 poise: 26,
                 owner: 'player',
                 facing: player.facing,
-                beamLen: 92
+                beamLen: 92,
+                beamWidth: 20
             });
             return origin;
         }
@@ -347,6 +447,8 @@
             p.homeY = data.homeY || 0;
             p.facing = data.facing || 'right';
             p.beamLen = data.beamLen || 0;
+            p.beamWidth = data.beamWidth || 0;
+            p.hitShape = data.hitShape || '';
             p.hitIds = null;
             this.live.push(p);
             if (this.live.length > this.limit) {
@@ -391,8 +493,7 @@
                     for (let e = 0; e < enemies.length; e++) {
                         const enemy = enemies[e];
                         if (!enemy.isAlive || enemy.area !== player._area) continue;
-                        const dist = Math.hypot(enemy.x - p.x, enemy.y - p.y);
-                        if (dist < enemy.radius + p.radius) {
+                        if (projectileHitsEnemy(p, enemy)) {
                             const key = enemy._uid || e;
                             p.hitIds = p.hitIds || Object.create(null);
                             if (!p.hitIds[key]) {
@@ -478,6 +579,19 @@
                     ctx.beginPath();
                     ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
                     ctx.fill();
+                }
+                if (global.GameState && global.GameState.debugHitboxes) {
+                    ctx.strokeStyle = 'rgba(250, 204, 21, 0.85)';
+                    ctx.lineWidth = 1.5;
+                    if (p.kind === 'saber' || p.hitShape === 'beam') {
+                        const len = p.beamLen || 56;
+                        const bw = p.beamWidth || 20;
+                        ctx.strokeRect((-len / 2) | 0, (-bw / 2) | 0, len | 0, bw | 0);
+                    } else if (p.radius > 0) {
+                        ctx.beginPath();
+                        ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
+                        ctx.stroke();
+                    }
                 }
                 ctx.restore();
             }
@@ -576,8 +690,12 @@
         rankOf,
         RANKS,
         WEAPONS,
+        HIT_PROFILES,
         weaponOf,
         fireAttack,
-        fireSkill
+        fireSkill,
+        projectileHitsEnemy,
+        circleHitsCircle,
+        beamHitsCircle
     };
 })(window);
